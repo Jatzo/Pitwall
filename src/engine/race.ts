@@ -198,6 +198,14 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
+/**
+ * A car's race-day form on a weekend: the first draw of its race stream, so
+ * qualifying on the same seed can show part of the same good or bad day.
+ */
+export function raceForm(seed: number, id: string): number {
+  return new Rng(mixSeed(seed, id)).normal(0, TUNING.formSigma);
+}
+
 /** Laps in a full-distance race at this circuit (about 305 km). */
 export function referenceRaceLaps(track: TrackDef): number {
   return Math.ceil((TUNING.referenceRaceKm * 1000) / track.lengthM);

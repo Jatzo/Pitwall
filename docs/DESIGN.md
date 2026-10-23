@@ -70,14 +70,14 @@ Weather draws come from their own streams, and every wet-only path is skipped on
 
 | Measure | Target | Full distance | 35% distance |
 | --- | --- | --- | --- |
-| On-track overtakes per race | about 50 | 43.8 | 27.6 |
-| Safety cars per race | about 1 | 1.02 | 0.38 |
-| Retirements per race | about 1.6 | 1.60 | 0.71 |
-| Winners on one / two / three stops | both one and two common | 47% / 44% / 9% | 99% one stop |
-| Pole position converted to a win | about half | 51% | 57% |
-| Won from fourth or lower on the grid | some | 10% | 7% |
-| Average winning margin | under about 10 s | 12.5 s | 4.8 s |
-| Fastest lap against the reference lap | within a few tenths | +0.35 s | +0.26 s |
+| On-track overtakes per race | about 50 | 45.9 | 28.2 |
+| Safety cars per race | about 1 | 0.99 | 0.40 |
+| Retirements per race | about 1.6 | 1.63 | 0.69 |
+| Winners on one / two / three stops | both one and two common | 49% / 43% / 7% | 100% one stop |
+| Pole position converted to a win | about half | 54% | 57% |
+| Won from fourth or lower on the grid | some | 10% | 9% |
+| Average winning margin | under about 10 s | 12.5 s | 4.5 s |
+| Fastest lap against the reference lap | within a few tenths | +0.37 s | +0.28 s |
 
 Overtaking sits a little under its target. The circuits were rebuilt with real corner radii, which leaves fewer and shorter straights where cars can pass, and raising the base pass rate by a quarter (`passRate` 0.1 to 0.125) only added three passes a race. The number of places to pass now sets the limit.
 
@@ -85,24 +85,26 @@ Each circuit is meant to pose a different problem, and the per-circuit rows show
 
 | Circuit | Character | Corners | Overtakes | Stops per car | One-stop winners |
 | --- | --- | --- | --- | --- | --- |
-| Hartwell Park | fastest lap, longest straight | 15 | 71 | 1.55 | 63% |
-| Kestrel Ring | short and twisty | 12 | 54 | 1.95 | 30% |
-| Dunmore Circuit | shortest lap, 79 laps | 11 | 49 | 2.05 | 27% |
-| Ridgeback Raceway | highest tyre wear | 12 | 47 | 2.14 | 37% |
-| Vennholt Ring | tight and technical | 16 | 47 | 1.91 | 37% |
-| Sable Coast Autodrome | long back straight | 16 | 46 | 1.68 | 53% |
-| Monte Alba Autodrome | fast, two DRS zones | 14 | 45 | 1.55 | 67% |
-| Silverwood Circuit | all-rounder | 13 | 44 | 1.62 | 50% |
-| Costa Alta Street Circuit | street circuit | 17 | 26 | 1.79 | 47% |
-| Port Calder Street Circuit | slow street circuit | 16 | 9 | 1.77 | 57% |
+| Hartwell Park | fastest lap, longest straight | 15 | 75 | 1.30 | 80% |
+| Kestrel Ring | short and twisty | 12 | 56 | 1.88 | 43% |
+| Monte Alba Autodrome | fast, two DRS zones | 14 | 50 | 1.65 | 53% |
+| Dunmore Circuit | shortest lap, 79 laps | 11 | 50 | 2.13 | 17% |
+| Sable Coast Autodrome | long back straight | 16 | 50 | 1.66 | 53% |
+| Ridgeback Raceway | highest tyre wear | 12 | 48 | 2.01 | 43% |
+| Vennholt Ring | tight and technical | 16 | 47 | 1.84 | 27% |
+| Silverwood Circuit | all-rounder | 13 | 47 | 1.67 | 60% |
+| Costa Alta Street Circuit | street circuit | 17 | 26 | 1.76 | 57% |
+| Port Calder Street Circuit | slow street circuit | 16 | 9 | 1.85 | 60% |
 
-With real corners the spread of overtaking between circuits now looks like real racing: a handful at the slow street circuit, around seventy at the power circuit. A car stuck behind another still retries every second, so Port Calder keeps a high difficulty (6) on top of its layout. Tyre wear is set per lap, so short laps such as Dunmore's add up to more stops over a race.
+With real corners the spread of overtaking between circuits now looks like real racing: a handful at the slow street circuit, around seventy-five at the power circuit. A car stuck behind another still retries every second, so Port Calder keeps a high difficulty (6) on top of its layout. Tyre wear is set per lap, so short laps such as Dunmore's add up to more stops over a race.
 
 Covered by tests as well: a green-flag stop costs 18 to 27 s (measured median 21.4 s over 2,825 stops). Every circuit is also checked for layout faults: it must not come within 100 m of itself, must have 10 to 20 corners and a corner under 100 km/h, must keep every straight under the 2 km limit, must have room for the pit lane on the start straight with the drawn lane clear of the rest of the track, must not need speeds faster than its layout allows, and must hold an 8-lap race with every car classified.
 
 Two measurements shaped the race-control design. A stop under the safety car costs about 0.17 places on average against 3.1 places under green flags (974 and 2,816 stops), because the field slows and bunches up. That is why the game pauses and asks the player to make that call. And hazards are set per full-distance race: mechanical failures are a rate per second of a 305 km race, and incidents grow with the square root of distance, so a short race keeps some drama without a full race's worth of retirements.
 
-With weather on (`--weather`), as in the game, 28% of full-distance races see rain. Wet races average 4.15 stops a car and 17% of them are won from fourth or lower, against 10% of dry races. Across all races, retirements rise from 1.60 to 1.70 and safety cars from 1.02 to 1.11.
+With weather on (`--weather`), as in the game, 28% of full-distance races see rain. Wet races average 4.11 stops a car and 16% of them are won from fourth or lower, against 10% of dry races. Across all races, retirements rise from 1.63 to 1.73 and safety cars from 0.99 to 1.05.
+
+Qualifying uses the same car and driver ratings as the race, plus three sources of luck: half of each driver's race-day form (`qualiFormShare`), a factor shared by a team's two cars for how well the car suits that session (`qualiTeamSigma`, 0.2 s), and lap-to-lap noise set by driver consistency. Without the first two, the top team took pole in all 200 test sessions and every team qualified within about a place of its usual spot. Now the fastest team on each circuit takes pole 60% of the time, midfield teams move three places or so from weekend to weekend, and the slowest team's best is 14th. Sharing all of the race-day form made pole too good a bet (66% of poles won, 3% of races won from fourth or lower), so qualifying shows only half of it.
 
 The last tuning pass narrowed the car spread (`carSecPerPoint` 0.085 to 0.07), widened race-day form (`formSigma` 0.2 to 0.3), and taught the AI to save its tyres when nobody is within reach (`cruiseGap`), as real leaders do. Before it, pole won 65% of races, only 3% were won from fourth or lower, and the average margin was 15.2 s.
 

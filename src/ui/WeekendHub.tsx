@@ -76,7 +76,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
   const byId = new Map<string, { team: TeamDef; name: string }>();
   for (const team of teams) team.drivers.forEach((d, i) => byId.set(`${team.id}:${i}`, { team, name: d.name }));
 
-  const runQuali = () => setQuali(runQualifying(trackDef, teams, raceSeed(career, round) + 1));
+  const runQuali = () => setQuali(runQualifying(trackDef, teams, seed));
 
   const start = () => {
     if (!quali) return;

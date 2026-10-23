@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { defaultTeams } from '../data/teams.ts';
 import { TRACKS } from '../data/tracks.ts';
 import { runQualifying } from './qualifying.ts';
-import { RaceSim, TUNING, aiPaceMode, carId, incidentRatePerSecond, referenceRaceLaps } from './race.ts';
+import { RaceSim, TUNING, aiPaceMode, carId, incidentRatePerSecond, raceForm, referenceRaceLaps } from './race.ts';
 import type { RaceConfig } from './race.ts';
 import { POINTS_TABLE, scoreRace } from './scoring.ts';
 import type { WeatherTimeline } from './weather.ts';
@@ -62,6 +62,40 @@ describe('qualifying', () => {
   it('is deterministic', () => {
     const teams = defaultTeams();
     assert.deepEqual(runQualifying(TRACKS[1], teams, 3), runQualifying(TRACKS[1], teams, 3));
+  });
+
+  it('reads the same race-day form the race draws on that seed', () => {
+    const sim = makeSim({ seed: 9 });
+    for (const car of sim.cars) {
+      const w = sim.track.def.weights;
+      const perf = car.team.car.power * w.power + car.team.car.aero * w.aero + car.team.car.chassis * w.chassis;
+      assert.ok(Math.abs(car.carDelta - (100 - perf) * TUNING.carSecPerPoint - raceForm(9, car.id)) < 1e-9, car.id);
+    }
+  });
+
+  it('changes from weekend to weekend while the best car still leads more often than not', () => {
+    const teams = defaultTeams();
+    let sessions = 0;
+    let fastestOnPole = 0;
+    let slowestBest = Infinity;
+    for (const track of TRACKS) {
+      const perf = (i: number) => {
+        const c = teams[i].car;
+        return c.power * track.weights.power + c.aero * track.weights.aero + c.chassis * track.weights.chassis;
+      };
+      const order = teams.map((_, i) => i).sort((a, b) => perf(b) - perf(a));
+      const fastest = teams[order[0]].id;
+      const slowest = teams[order[order.length - 1]].id;
+      for (let s = 1; s <= 20; s++) {
+        const grid = runQualifying(track, teams, s * 7919).grid;
+        sessions++;
+        if (grid[0].startsWith(`${fastest}:`)) fastestOnPole++;
+        slowestBest = Math.min(slowestBest, grid.findIndex((id) => id.startsWith(`${slowest}:`)) + 1);
+      }
+    }
+    const share = fastestOnPole / sessions;
+    assert.ok(share >= 0.4 && share <= 0.7, `fastest team on pole ${share}`);
+    assert.ok(slowestBest <= 15, `slowest team's best grid slot ${slowestBest}`);
   });
 });
 

@@ -15,7 +15,7 @@ A real-time race simulation has three requirements that pull against each other.
 | Probability | `src/engine/weather.ts` | A rain forecast built with Bayes' rule, with its reliability measured over 2,000 races per race length |
 | Deterministic design | `src/engine/rng.ts` | `mixSeed(seed, label)` gives each purpose its own random stream, so adding a car or an event does not reshuffle other draws |
 | React architecture | `src/ui/RaceScreen.tsx`, `moments.ts` | A fixed 0.1 s simulation step inside an animation loop, with interpolation, and pausing on the exact step through refs |
-| Testing | `src/**/*.test.ts` | 202 `node:test` tests, including statistical tests (forecast honesty, rain frequency) and geometry tests (every circuit checked for faults) |
+| Testing | `src/**/*.test.ts` | 205 `node:test` tests, including statistical tests (forecast honesty, rain frequency) and geometry tests (every circuit checked for faults) |
 | Calibration method | `scripts/calibrate.ts` | Batch runs of 300 headless races compared with real-race targets, recorded in `docs/DESIGN.md` |
 | CI/CD | `.github/workflows/ci.yml`, `deploy.yml` | GitHub Actions runs typecheck, lint, test and build, then deploys to Pages |
 | Accessibility | `src/ui/TimingTower.tsx`, `Conditions.tsx`, `DecisionPrompt.tsx` | A timing tower that works from the keyboard, ARIA meters, and an alert dialog for race decisions |

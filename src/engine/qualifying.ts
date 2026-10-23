@@ -4,7 +4,7 @@
  */
 
 import { Rng, mixSeed } from './rng.ts';
-import { TUNING, carId } from './race.ts';
+import { TUNING, carId, raceForm } from './race.ts';
 import { Track } from './track.ts';
 import type { TrackDef } from './track.ts';
 import { COMPOUNDS } from './tyres.ts';
@@ -29,6 +29,11 @@ export interface QualifyingResult {
 const SESSION_GAIN = 0.12; // track improves between sessions (seconds)
 const QUALI_FUEL_KG = 6;
 
+/**
+ * `seed` is the race's own seed: part of each driver's race-day form shows in
+ * qualifying, the rest is the session's own luck, and each team gets a
+ * qualifying-only factor for how well its car suits the session.
+ */
 export function runQualifying(track: TrackDef, teams: readonly TeamDef[], seed: number): QualifyingResult {
   const geom = new Track(track);
   const w = track.weights;
@@ -46,6 +51,7 @@ export function runQualifying(track: TrackDef, teams: readonly TeamDef[], seed: 
   const entrants: Entrant[] = [];
   for (const team of teams) {
     const perf = team.car.power * w.power + team.car.aero * w.aero + team.car.chassis * w.chassis;
+    const session = new Rng(mixSeed(seed, `quali-team:${team.id}`)).normal(0, TUNING.qualiTeamSigma);
     team.drivers.forEach((driver, i) => {
       const id = carId(team, i as 0 | 1);
       entrants.push({
@@ -56,7 +62,10 @@ export function runQualifying(track: TrackDef, teams: readonly TeamDef[], seed: 
           (100 - driver.ratings.pace) * TUNING.driverSecPerPoint +
           COMPOUNDS.S.paceDelta +
           QUALI_FUEL_KG * TUNING.fuelSecPerKg +
-          TUNING.engineMode.rich.pace,
+          TUNING.engineMode.rich.pace +
+          TUNING.qualiFormShare * raceForm(seed, id) +
+          Math.sqrt(1 - TUNING.qualiFormShare ** 2) * new Rng(mixSeed(seed, `quali-form:${id}`)).normal(0, TUNING.formSigma) +
+          session,
         sigma: 0.07 + (100 - driver.ratings.consistency) * 0.006,
         q1: null,
         q2: null,

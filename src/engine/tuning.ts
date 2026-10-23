@@ -10,6 +10,13 @@ export const TUNING = {
   driverSecPerPoint: 0.03,
   /** Per-race random "form" of each car, standard deviation in seconds. */
   formSigma: 0.3,
+  /** How well a car suits one qualifying session, shared by both cars of a team, in seconds. */
+  qualiTeamSigma: 0.2,
+  /**
+   * How much of a driver's race-day form shows in qualifying (0 to 1); the rest
+   * is that session's own luck. All of it made pole too good a bet in the race.
+   */
+  qualiFormShare: 0.5,
   fuelSecPerKg: 0.03,
   /** Fuel burn per lap at a 5.3 km track. Scaled by lap length. */
   fuelPerLapRef: 1.55,

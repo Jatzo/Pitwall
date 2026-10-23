@@ -19,7 +19,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Deterministic design:** a separate seeded random stream for each purpose.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 202 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 205 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -46,7 +46,7 @@ The engine is plain TypeScript with no UI or browser dependencies, deterministic
 - **Racing**: overtakes are probabilistic and depend on pace delta, DRS, circuit difficulty and driver racecraft. Incidents, mechanical failures and punctures trigger a safety car that bunches the field.
 - **Pit stops** are a small state machine (pit lane at 80 km/h, stationary time from crew rating, double-stack queueing). A one-compound race costs 30 s, as in the real rules.
 - **AI strategy** enumerates stop counts and compound orders, allocates stint lengths by marginal cost, and adds jitter so rivals do not all pit together. In the race, AI drivers push when they have a car to catch or defend from, and save tyres when nobody is within reach.
-- **Calibrated** against real-race figures over 300 headless races: about 44 overtakes, 1 safety car and 1.6 retirements per full race, pole converted about half the time. The table is in [docs/DESIGN.md](docs/DESIGN.md#calibration).
+- **Calibrated** against real-race figures over 300 headless races: about 46 overtakes, 1 safety car and 1.6 retirements per full race, pole converted about half the time. The table is in [docs/DESIGN.md](docs/DESIGN.md#calibration).
 - **Gaps** come from per-car 10 m checkpoint times, so intervals are real time gaps rather than distance estimates.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the architecture, the calibration targets, and the roadmap.
