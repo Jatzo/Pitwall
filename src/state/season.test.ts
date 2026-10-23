@@ -9,6 +9,7 @@ import {
   newCareer,
   raceSeed,
   recordRace,
+  roundSummary,
   teamStandings,
 } from './season.ts';
 
@@ -70,5 +71,20 @@ describe('season', () => {
     const career = newCareer('aurora', 1234);
     assert.equal(raceSeed(career, 2), raceSeed(career, 2));
     assert.notEqual(raceSeed(career, 0), raceSeed(career, 1));
+  });
+
+  it('summarises a round by its winner and the best finish of the player team', () => {
+    const c = recordRace(newCareer('cobalt', 1), 10, [
+      row('aurora:0', 1, 25),
+      row('velox:1', 2, 18),
+      row('cobalt:1', 3, 15),
+      row('cobalt:0', 20, 0, false),
+    ]);
+    assert.deepEqual(roundSummary(c.results[0], 'cobalt'), { winnerCarId: 'aurora:0', playerBest: 3, playerPoints: 15 });
+  });
+
+  it('reports no best finish when both player cars retire', () => {
+    const c = recordRace(newCareer('cobalt', 1), 10, [row('aurora:0', 1, 25), row('cobalt:0', 19, 0, false), row('cobalt:1', 20, 0, false)]);
+    assert.equal(roundSummary(c.results[0], 'cobalt').playerBest, null);
   });
 });

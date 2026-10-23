@@ -41,20 +41,37 @@
 
 ## Calibration
 
-`npm run calibrate -- --seeds 75` runs 300 full-distance races (75 seeds on each of the 4 circuits) with every car on AI strategy and prints the averages below. `--fraction 0.35` does the same at the game's default "Short" distance. The targets come from real grands prix; the figures are the last measurement.
+`npm run calibrate -- --seeds 30` runs 300 full-distance races (30 seeds on each of the 10 circuits) with every car on AI strategy and prints the averages below. `--fraction 0.35` does the same at the game's default "Short" distance. The targets come from real grands prix; the figures are the last measurement.
 
 | Measure | Target | Full distance | 35% distance |
 | --- | --- | --- | --- |
-| On-track overtakes per race | about 50 | 56.7 | 30.4 |
-| Safety cars per race | about 1 | 1.02 | 0.43 |
-| Retirements per race | about 1.6 | 1.69 | 0.69 |
-| Winners on one / two / three stops | both one and two common | 44% / 44% / 11% | 99% one stop |
-| Pole position converted to a win | about half | 52% | 53% |
-| Won from fourth or lower on the grid | some | 11% | 8% |
-| Average winning margin | under about 10 s | 10.9 s | 4.2 s |
-| Fastest lap against the reference lap | within a few tenths | +0.40 s | +0.33 s |
+| On-track overtakes per race | about 50 | 62.6 | 32.7 |
+| Safety cars per race | about 1 | 1.04 | 0.41 |
+| Retirements per race | about 1.6 | 1.70 | 0.74 |
+| Winners on one / two / three stops | both one and two common | 44% / 45% / 10% | 99% one stop |
+| Pole position converted to a win | about half | 55% | 48% |
+| Won from fourth or lower on the grid | some | 6% | 9% |
+| Average winning margin | under about 10 s | 12.1 s | 4.0 s |
+| Fastest lap against the reference lap | within a few tenths | +0.39 s | +0.33 s |
 
-Covered by tests as well: a green-flag stop costs 18 to 27 s (measured median 21.6 s over 1,274 stops).
+Each circuit is meant to pose a different problem, and the per-circuit rows show it does (full distance, 30 races each):
+
+| Circuit | Character | Overtakes | Stops per car | One-stop winners |
+| --- | --- | --- | --- | --- |
+| Hartwell Park | fastest lap, three DRS zones | 105 | 1.55 | 73% |
+| Sable Coast Autodrome | long back straight | 79 | 1.64 | 60% |
+| Monte Alba Autodrome | fast, two DRS zones | 65 | 1.68 | 53% |
+| Ridgeback Raceway | highest tyre wear | 60 | 2.20 | 37% |
+| Silverwood Circuit | all-rounder | 58 | 1.83 | 50% |
+| Kestrel Ring | short and twisty | 58 | 1.94 | 27% |
+| Dunmore Circuit | shortest lap, 79 laps | 57 | 2.13 | 20% |
+| Vennholt Ring | tight and technical | 54 | 1.86 | 33% |
+| Costa Alta Street Circuit | street circuit | 46 | 1.77 | 43% |
+| Port Calder Street Circuit | slow street circuit | 44 | 1.80 | 47% |
+
+The range of overtakes between circuits is narrower than in real racing, where a street circuit can see a handful and the busiest circuits around eighty. A car stuck behind another keeps trying every second, so a circuit's difficulty mostly delays a pass rather than preventing it; Port Calder needs a difficulty of 6 to be the hardest place to pass. Tyre wear is set per lap, so short laps such as Dunmore's add up to more stops over a race.
+
+Covered by tests as well: a green-flag stop costs 18 to 27 s (measured median 21.6 s over 1,274 stops). Every circuit is also checked for layout faults: it must not come within 100 m of itself, must start on a near-straight so the grid and pit lane fit, must not need speeds faster than its layout allows, and must hold an 8-lap race with every car classified.
 
 Two measurements shaped the race-control design. A stop under the safety car costs about 0.15 places on average against 3.3 places under green flags (400 and 1,140 stops), because the field slows and bunches up. That is why the game pauses and asks the player to make that call. And hazards are set per full-distance race: mechanical failures are a rate per second of a 305 km race, and incidents grow with the square root of distance, so a short race keeps some drama without a full race's worth of retirements.
 
@@ -72,9 +89,9 @@ The last tuning pass narrowed the car spread (`carSecPerPoint` 0.085 to 0.07), w
 
 ## Roadmap
 
-1. Season calendar of 8 to 12 circuits, with calendar and championship screens.
-2. Weather: rain, drying lines, intermediates and wets, with forecast uncertainty.
-3. Budget, R&D and car upgrades between rounds.
-4. Driver contracts, development and a transfer market.
-5. Sponsors and objectives.
-6. Replay from the command log, plus lap-time and tyre-wear charts.
+1. Weather: rain, drying lines, intermediates and wets, with forecast uncertainty.
+2. Budget, R&D and car upgrades between rounds.
+3. Driver contracts, development and a transfer market.
+4. Sponsors and objectives.
+5. Replay from the command log, plus lap-time and tyre-wear charts.
+6. A wider spread of overtaking between circuits (see Calibration).

@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "test": "node --test \"src/**/*.test.ts\"",
     "sim": "node scripts/sim.ts",
-    "calibrate": "node scripts/calibrate.ts"
+    "calibrate": "node scripts/calibrate.ts",
+    "circuits": "node scripts/track-info.ts"
   },
   "dependencies": {
     "react": "^19.2.0",
