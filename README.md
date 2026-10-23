@@ -10,9 +10,21 @@ Everything in it is fictional (teams, drivers, circuits), and everything is edit
 | --- | --- | --- |
 | ![Weekend](docs/screenshots/weekend.png) | ![Results](docs/screenshots/results.png) | ![Editor](docs/screenshots/team-editor.png) |
 
+## What this project shows
+
+Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells nine problems as seen, measured, changed and result.
+
+- **Modelling and algorithms:** circuits built from real corner radii, tyre wear, weather, strategy search, 10 m checkpoint gap timing.
+- **Probability:** a Bayesian rain forecast, checked over 2,000 races per race length.
+- **Deterministic design:** a separate seeded random stream for each purpose.
+- **Calibration:** 300 headless races per tuning run, compared with real-race targets.
+- **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
+- **Testing and CI:** 202 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
+
 ## What is in the game
 
-- **Live track map** with a marker per car, DRS zones, pit lane, sector lines, corner numbers and the safety car.
+- **Live track map** with a marker per car, DRS zones, a pit lane with each team's garage, sector lines, corner numbers and the safety car.
 - **Timing tower** with interval or gap to leader, last lap (purple for fastest, green for personal best), tyre compound and age, sector colours and pit stops.
 - **Pit wall** for your two cars: pace and engine modes, pit-now with compound choice and a projected rejoin position, an editable stop plan with tyre-wear forecasts and warnings, tyre-life and fuel-margin estimates, and an optional AI race engineer.
 - **Key moments pause the race**: when the safety car comes out, one of your cars is damaged, rain starts, or the conditions turn in favour of another tyre, the game stops and asks for your pit call (this can be turned off).
@@ -27,14 +39,14 @@ Everything in it is fictional (teams, drivers, circuits), and everything is edit
 
 The engine is plain TypeScript with no UI or browser dependencies, deterministic for a given seed, and runs a full 58-lap race in well under a second headless.
 
-- **Circuits** are closed splines resampled every 5 m. A speed profile comes from lateral-grip limits plus acceleration and braking passes, then is scaled to a target lap time. DRS zones, corners, sectors and a pit lane are derived from the geometry.
+- **Circuits** are drawn the way circuit designers draw them: key points in metres, each with a corner radius, joined by straights and true arcs. The corner counts, radii and straight lengths follow [research into real circuits](docs/research/circuit-design.md). A speed profile comes from grip that rises with speed as downforce builds, plus acceleration and braking passes. DRS zones, corner numbers, sectors and the pit lane come from the geometry.
 - **Pace** combines car ratings weighted by circuit, driver ratings, per-race form, fuel load, tyre compound, wear and warm-up, engine and pace modes, track rubbering, dirty air and DRS.
 - **Tyres** have three slick compounds with linear degradation and a quadratic cliff past 72% wear, plus intermediates and full wets whose pace depends on how wet the racing line is.
 - **Weather** is a rain timeline decided with the round. Track wetness rises with rain and dries fastest on the racing line. The forecast turns a noisy reading of each window into a probability with Bayes' rule, and its reliability is measured: stated chances come true within a few points of what they say.
 - **Racing**: overtakes are probabilistic and depend on pace delta, DRS, circuit difficulty and driver racecraft. Incidents, mechanical failures and punctures trigger a safety car that bunches the field.
 - **Pit stops** are a small state machine (pit lane at 80 km/h, stationary time from crew rating, double-stack queueing). A one-compound race costs 30 s, as in the real rules.
 - **AI strategy** enumerates stop counts and compound orders, allocates stint lengths by marginal cost, and adds jitter so rivals do not all pit together. In the race, AI drivers push when they have a car to catch or defend from, and save tyres when nobody is within reach.
-- **Calibrated** against real-race figures over 300 headless races: about 63 overtakes, 1 safety car and 1.7 retirements per full race, pole converted about half the time. The table is in [docs/DESIGN.md](docs/DESIGN.md#calibration).
+- **Calibrated** against real-race figures over 300 headless races: about 44 overtakes, 1 safety car and 1.6 retirements per full race, pole converted about half the time. The table is in [docs/DESIGN.md](docs/DESIGN.md#calibration).
 - **Gaps** come from per-car 10 m checkpoint times, so intervals are real time gaps rather than distance estimates.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the architecture, the calibration targets, and the roadmap.

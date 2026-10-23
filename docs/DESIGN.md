@@ -31,8 +31,8 @@
 
 | Area | Decision | Why |
 | --- | --- | --- |
-| Track | Centripetal Catmull-Rom spline, 5 m resample | Smooth closed loops from a handful of control points, no overshoot |
-| Speed profile | Grip limit, then forward acceleration and backward braking passes, rescaled to a reference lap | Plausible corner and straight speeds while keeping authored lap times |
+| Track | Polygon of key points in metres, each corner a true arc of authored radius, sampled every 5 m | Real straights and real corner radii, so hairpins and chicanes come out as they are drawn; the builder names the points when two corners do not fit |
+| Speed profile | Lateral grip that rises with speed (2 g in a hairpin, over 4 g in a fast sweeper), power-limited acceleration and 4 g braking, then scaled to a reference lap about 5% slower than the physics allows | Hairpins at 55 to 65 km/h, fast corners flat out, and lap times the layout can deliver |
 | Tyres | Linear wear effect plus a quadratic cliff at 72% | Gives a real reason to pit before the tyre "falls off" |
 | Overtaking | Probability per tick from pace delta, DRS, circuit ease and racecraft | No teleporting past cars, but also no unbreakable trains |
 | Gaps | 10 m checkpoint timestamps per car | Gap is time the car behind needs to reach where the car ahead was |
@@ -70,37 +70,39 @@ Weather draws come from their own streams, and every wet-only path is skipped on
 
 | Measure | Target | Full distance | 35% distance |
 | --- | --- | --- | --- |
-| On-track overtakes per race | about 50 | 62.6 | 32.7 |
-| Safety cars per race | about 1 | 1.04 | 0.41 |
-| Retirements per race | about 1.6 | 1.70 | 0.74 |
-| Winners on one / two / three stops | both one and two common | 44% / 45% / 10% | 99% one stop |
-| Pole position converted to a win | about half | 55% | 48% |
-| Won from fourth or lower on the grid | some | 6% | 9% |
-| Average winning margin | under about 10 s | 12.1 s | 4.0 s |
-| Fastest lap against the reference lap | within a few tenths | +0.39 s | +0.33 s |
+| On-track overtakes per race | about 50 | 43.8 | 27.6 |
+| Safety cars per race | about 1 | 1.02 | 0.38 |
+| Retirements per race | about 1.6 | 1.60 | 0.71 |
+| Winners on one / two / three stops | both one and two common | 47% / 44% / 9% | 99% one stop |
+| Pole position converted to a win | about half | 51% | 57% |
+| Won from fourth or lower on the grid | some | 10% | 7% |
+| Average winning margin | under about 10 s | 12.5 s | 4.8 s |
+| Fastest lap against the reference lap | within a few tenths | +0.35 s | +0.26 s |
+
+Overtaking sits a little under its target. The circuits were rebuilt with real corner radii, which leaves fewer and shorter straights where cars can pass, and raising the base pass rate by a quarter (`passRate` 0.1 to 0.125) only added three passes a race. The number of places to pass now sets the limit.
 
 Each circuit is meant to pose a different problem, and the per-circuit rows show it does (full distance, 30 races each):
 
-| Circuit | Character | Overtakes | Stops per car | One-stop winners |
-| --- | --- | --- | --- | --- |
-| Hartwell Park | fastest lap, three DRS zones | 105 | 1.55 | 73% |
-| Sable Coast Autodrome | long back straight | 79 | 1.64 | 60% |
-| Monte Alba Autodrome | fast, two DRS zones | 65 | 1.68 | 53% |
-| Ridgeback Raceway | highest tyre wear | 60 | 2.20 | 37% |
-| Silverwood Circuit | all-rounder | 58 | 1.83 | 50% |
-| Kestrel Ring | short and twisty | 58 | 1.94 | 27% |
-| Dunmore Circuit | shortest lap, 79 laps | 57 | 2.13 | 20% |
-| Vennholt Ring | tight and technical | 54 | 1.86 | 33% |
-| Costa Alta Street Circuit | street circuit | 46 | 1.77 | 43% |
-| Port Calder Street Circuit | slow street circuit | 44 | 1.80 | 47% |
+| Circuit | Character | Corners | Overtakes | Stops per car | One-stop winners |
+| --- | --- | --- | --- | --- | --- |
+| Hartwell Park | fastest lap, longest straight | 15 | 71 | 1.55 | 63% |
+| Kestrel Ring | short and twisty | 12 | 54 | 1.95 | 30% |
+| Dunmore Circuit | shortest lap, 79 laps | 11 | 49 | 2.05 | 27% |
+| Ridgeback Raceway | highest tyre wear | 12 | 47 | 2.14 | 37% |
+| Vennholt Ring | tight and technical | 16 | 47 | 1.91 | 37% |
+| Sable Coast Autodrome | long back straight | 16 | 46 | 1.68 | 53% |
+| Monte Alba Autodrome | fast, two DRS zones | 14 | 45 | 1.55 | 67% |
+| Silverwood Circuit | all-rounder | 13 | 44 | 1.62 | 50% |
+| Costa Alta Street Circuit | street circuit | 17 | 26 | 1.79 | 47% |
+| Port Calder Street Circuit | slow street circuit | 16 | 9 | 1.77 | 57% |
 
-The range of overtakes between circuits is narrower than in real racing, where a street circuit can see a handful and the busiest circuits around eighty. A car stuck behind another keeps trying every second, so a circuit's difficulty mostly delays a pass rather than preventing it; Port Calder needs a difficulty of 6 to be the hardest place to pass. Tyre wear is set per lap, so short laps such as Dunmore's add up to more stops over a race.
+With real corners the spread of overtaking between circuits now looks like real racing: a handful at the slow street circuit, around seventy at the power circuit. A car stuck behind another still retries every second, so Port Calder keeps a high difficulty (6) on top of its layout. Tyre wear is set per lap, so short laps such as Dunmore's add up to more stops over a race.
 
-Covered by tests as well: a green-flag stop costs 18 to 27 s (measured median 21.6 s over 1,274 stops). Every circuit is also checked for layout faults: it must not come within 100 m of itself, must start on a near-straight so the grid and pit lane fit, must not need speeds faster than its layout allows, and must hold an 8-lap race with every car classified.
+Covered by tests as well: a green-flag stop costs 18 to 27 s (measured median 21.4 s over 2,825 stops). Every circuit is also checked for layout faults: it must not come within 100 m of itself, must have 10 to 20 corners and a corner under 100 km/h, must keep every straight under the 2 km limit, must have room for the pit lane on the start straight with the drawn lane clear of the rest of the track, must not need speeds faster than its layout allows, and must hold an 8-lap race with every car classified.
 
-Two measurements shaped the race-control design. A stop under the safety car costs about 0.15 places on average against 3.3 places under green flags (400 and 1,140 stops), because the field slows and bunches up. That is why the game pauses and asks the player to make that call. And hazards are set per full-distance race: mechanical failures are a rate per second of a 305 km race, and incidents grow with the square root of distance, so a short race keeps some drama without a full race's worth of retirements.
+Two measurements shaped the race-control design. A stop under the safety car costs about 0.17 places on average against 3.1 places under green flags (974 and 2,816 stops), because the field slows and bunches up. That is why the game pauses and asks the player to make that call. And hazards are set per full-distance race: mechanical failures are a rate per second of a 305 km race, and incidents grow with the square root of distance, so a short race keeps some drama without a full race's worth of retirements.
 
-With weather on (`--weather`), as in the game, 28% of full-distance races see rain. Wet races average 4.14 stops a car and 29% of them are won from fourth or lower, against 6% of dry races. Across all races, retirements rise from 1.70 to 1.77 and safety cars from 1.04 to 1.11.
+With weather on (`--weather`), as in the game, 28% of full-distance races see rain. Wet races average 4.15 stops a car and 17% of them are won from fourth or lower, against 10% of dry races. Across all races, retirements rise from 1.60 to 1.70 and safety cars from 1.02 to 1.11.
 
 The last tuning pass narrowed the car spread (`carSecPerPoint` 0.085 to 0.07), widened race-day form (`formSigma` 0.2 to 0.3), and taught the AI to save its tyres when nobody is within reach (`cruiseGap`), as real leaders do. Before it, pole won 65% of races, only 3% were won from fourth or lower, and the average margin was 15.2 s.
 
@@ -114,7 +116,8 @@ The last tuning pass narrowed the car spread (`carSecPerPoint` 0.085 to 0.07), w
 - Car development does not exist yet.
 - Qualifying is always dry; rain arrives only in the race.
 - Rival teams sometimes fit intermediates and then full wets a few laps later in a strengthening shower, because they only see the rain already falling.
-- Track maps are authored from control points, not scanned from real layouts, by design.
+- Circuits are drawn to the design rules of real circuits (corner counts, radii, straight lengths: see [research/circuit-design.md](research/circuit-design.md)) but are not copies of real layouts, by design.
+- The pit lane is drawn with each team's garage, but the race still times every stop at the start line; the map moves each car to its own garage.
 
 ## Roadmap
 
@@ -122,5 +125,4 @@ The last tuning pass narrowed the car spread (`carSecPerPoint` 0.085 to 0.07), w
 2. Driver contracts, development and a transfer market.
 3. Sponsors and objectives.
 4. Replay from the command log, plus lap-time and tyre-wear charts.
-5. A wider spread of overtaking between circuits (see Calibration).
-6. Wet qualifying.
+5. Wet qualifying.
