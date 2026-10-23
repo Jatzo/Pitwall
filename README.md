@@ -16,7 +16,10 @@ Everything in it is fictional (teams, drivers, circuits), and everything is edit
 - **Timing tower** with interval or gap to leader, last lap (purple for fastest, green for personal best), tyre compound and age, sector colours and pit stops.
 - **Pit wall** for your two cars: pace and engine modes, pit-now with compound choice and a projected rejoin position, an editable stop plan with tyre-wear forecasts and warnings, tyre-life and fuel-margin estimates, and an optional AI race engineer.
 - **Key moments pause the race**: when the safety car comes out or one of your cars is damaged, the game stops and asks for your pit call (this can be turned off).
-- **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, and a drivers' and constructors' championship over a four-round season. Progress is saved in the browser.
+- **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, and a drivers' and constructors' championship over a ten-round season. Progress is saved in the browser; a season started before the calendar grew keeps its original four rounds.
+- **Ten fictional circuits**, each with its own problem: a fast power circuit, two street circuits where passing is hard, a tyre-eater, a 79-lap short track and more. A calendar screen shows each round's character and how your finished rounds went.
+
+![The ten circuits](docs/circuits.svg)
 - **Speed control** from 1x to 32x, pause, and skip to the flag.
 
 ## The simulation
@@ -29,7 +32,7 @@ The engine is plain TypeScript with no UI or browser dependencies, deterministic
 - **Racing**: overtakes are probabilistic and depend on pace delta, DRS, circuit difficulty and driver racecraft. Incidents, mechanical failures and punctures trigger a safety car that bunches the field.
 - **Pit stops** are a small state machine (pit lane at 80 km/h, stationary time from crew rating, double-stack queueing). A one-compound race costs 30 s, as in the real rules.
 - **AI strategy** enumerates stop counts and compound orders, allocates stint lengths by marginal cost, and adds jitter so rivals do not all pit together. In the race, AI drivers push when they have a car to catch or defend from, and save tyres when nobody is within reach.
-- **Calibrated** against real-race figures over 300 headless races: about 57 overtakes, 1 safety car and 1.7 retirements per full race, pole converted about half the time. The table is in [docs/DESIGN.md](docs/DESIGN.md#calibration).
+- **Calibrated** against real-race figures over 300 headless races: about 63 overtakes, 1 safety car and 1.7 retirements per full race, pole converted about half the time. The table is in [docs/DESIGN.md](docs/DESIGN.md#calibration).
 - **Gaps** come from per-car 10 m checkpoint times, so intervals are real time gaps rather than distance estimates.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the architecture, the calibration targets, and the roadmap.
@@ -44,7 +47,8 @@ npm run dev        # start the game at http://localhost:5173
 npm test           # engine and season unit tests (node:test, no extra dependencies)
 npm run build      # typecheck and production build into dist/
 npm run sim -- --track silverwood --seed 3   # run a whole race headless and print the result
-npm run calibrate -- --seeds 75               # 300 races, averages for the calibration table in docs/DESIGN.md
+npm run calibrate -- --seeds 30               # 300 races, averages for the calibration table in docs/DESIGN.md
+npm run circuits                              # circuit numbers, and redraw docs/circuits.svg
 ```
 
 Pushing to `main` runs tests and the build, then deploys `dist/` to GitHub Pages (enable Pages with the "GitHub Actions" source in the repository settings).
@@ -65,4 +69,4 @@ TypeScript (strict), React 19, Vite 7, Node's built-in test runner, ESLint 9, Gi
 
 ## Status
 
-The core loop (strategy, qualifying, race, standings) is playable. Planned next: a larger calendar, weather, R&D and budget, driver contracts and sponsors. All names are invented and not affiliated with any real championship.
+The core loop (strategy, qualifying, race, standings) over a ten-round calendar is playable. Planned next: weather, R&D and budget, driver contracts and sponsors. All names are invented and not affiliated with any real championship.
