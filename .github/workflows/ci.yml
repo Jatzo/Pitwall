@@ -14,8 +14,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # Switch to `npm ci` once package-lock.json is committed.
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

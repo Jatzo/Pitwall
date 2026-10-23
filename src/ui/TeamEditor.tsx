@@ -147,10 +147,7 @@ export function TeamEditor({ teams, onChange, onReset, onClose }: Props) {
                     <button
                       className="btn small"
                       onClick={() =>
-                        update((t) => {
-                          const { imageDataUrl: _drop, ...rest } = t.logo;
-                          return { ...t, logo: rest };
-                        })
+                        update((t) => ({ ...t, logo: { ...t.logo, imageDataUrl: undefined } }))
                       }
                     >
                       Use generated emblem

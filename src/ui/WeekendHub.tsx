@@ -72,7 +72,6 @@ export function WeekendHub({ career, teams, onStart }: Props) {
   }, [round, teams]);
   useEffect(() => {
     setPlans({ [`${playerTeam.id}:0`]: suggest(0), [`${playerTeam.id}:1`]: suggest(1) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round, laps, playerTeam.id]);
 
   const byId = new Map<string, { team: TeamDef; name: string }>();
