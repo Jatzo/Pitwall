@@ -1,6 +1,9 @@
 /** Shared domain types for the simulation engine. No UI dependencies. */
 
-export type Compound = 'S' | 'M' | 'H';
+/** Slick tyres for a dry track: soft, medium, hard. */
+export type DryCompound = 'S' | 'M' | 'H';
+/** Any tyre a car can carry: the slicks plus intermediates and full wets. */
+export type Compound = DryCompound | 'I' | 'W';
 export type PaceMode = 'push' | 'standard' | 'conserve';
 export type EngineMode = 'rich' | 'standard' | 'lean';
 

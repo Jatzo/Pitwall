@@ -7,7 +7,7 @@
 import type { CarState, RaceSim } from './race.ts';
 import { TUNING } from './race.ts';
 import type { TrackDef } from './track.ts';
-import { COMPOUNDS } from './tyres.ts';
+import { COMPOUNDS, scaledWearRates } from './tyres.ts';
 import type { Compound, DriverDef, StrategyPlan, TeamDef } from './types.ts';
 import type { WearRates } from './strategy.ts';
 
@@ -83,11 +83,7 @@ export function wearRatesFor(track: TrackDef, team: TeamDef, driver: DriverDef):
     track.tyreSeverity *
     (1.1 - (driver.ratings.tyreMgmt / 100) * 0.25) *
     (1.1 - (team.car.chassis / 100) * 0.2);
-  return {
-    S: COMPOUNDS.S.wearPerLap * k,
-    M: COMPOUNDS.M.wearPerLap * k,
-    H: COMPOUNDS.H.wearPerLap * k,
-  };
+  return scaledWearRates(k);
 }
 
 export interface PlannedStint {

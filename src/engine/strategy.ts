@@ -10,7 +10,7 @@
  */
 
 import type { Rng } from './rng.ts';
-import { ALL_COMPOUNDS, COMPOUNDS, tyrePenalty } from './tyres.ts';
+import { COMPOUNDS, DRY_COMPOUNDS, tyrePenalty } from './tyres.ts';
 import type { Compound, PlannedStop, StrategyPlan } from './types.ts';
 
 export type WearRates = Record<Compound, number>;
@@ -57,7 +57,7 @@ function* sequences(length: number, first: Compound | null): Generator<Compound[
       yield prefix;
       return;
     }
-    for (const c of ALL_COMPOUNDS) yield* extend([...prefix, c]);
+    for (const c of DRY_COMPOUNDS) yield* extend([...prefix, c]);
   };
   yield* extend(first ? [first] : []);
 }

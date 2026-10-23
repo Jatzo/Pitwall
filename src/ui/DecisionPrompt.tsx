@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { rejoinEstimate } from '../engine/insights.ts';
 import type { RaceSim } from '../engine/race.ts';
 import { TUNING } from '../engine/tuning.ts';
-import { ALL_COMPOUNDS, COMPOUNDS } from '../engine/tyres.ts';
+import { COMPOUNDS, PIT_COMPOUNDS } from '../engine/tyres.ts';
 import type { RaceCommand } from '../engine/types.ts';
 import { promptCars } from './moments.ts';
 import type { Moment } from './moments.ts';
@@ -51,7 +51,7 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
             </div>
             <div className="row wrap" style={{ gap: 6 }}>
               <span className="muted" style={{ fontSize: 12 }}>Box for</span>
-              {ALL_COMPOUNDS.map((c) => (
+              {PIT_COMPOUNDS.map((c) => (
                 <button
                   key={c}
                   className={`btn small ${car.pitRequest === c ? 'active' : ''}`}

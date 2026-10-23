@@ -26,6 +26,8 @@ export interface TrackDef {
   refLapS?: number;
   /** Maximum lateral acceleration in m/s^2 (default 22, about 2.2 g). */
   cornerAccel?: number;
+  /** Chance that rain falls at some point in a race here (0 to 1). */
+  rainChance?: number;
   /** Tyre wear multiplier. 1 = average. */
   tyreSeverity: number;
   /** Overtaking difficulty multiplier. 1 = average, higher = harder. */

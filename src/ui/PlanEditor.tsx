@@ -1,7 +1,7 @@
 import { analysePlan } from '../engine/insights.ts';
 import type { AnalyseOptions } from '../engine/insights.ts';
 import type { WearRates } from '../engine/strategy.ts';
-import { ALL_COMPOUNDS, COMPOUNDS } from '../engine/tyres.ts';
+import { COMPOUNDS, DRY_COMPOUNDS } from '../engine/tyres.ts';
 import type { Compound, StrategyPlan } from '../engine/types.ts';
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
 export function CompoundSelect({ value, onChange }: { value: Compound; onChange: (c: Compound) => void }) {
   return (
     <span className="btn-group">
-      {ALL_COMPOUNDS.map((c) => (
+      {DRY_COMPOUNDS.map((c) => (
         <button
           key={c}
           type="button"

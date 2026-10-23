@@ -6,6 +6,7 @@ import { runQualifying } from './qualifying.ts';
 import { RaceSim, TUNING, aiPaceMode, carId, incidentRatePerSecond, referenceRaceLaps } from './race.ts';
 import type { RaceConfig } from './race.ts';
 import { POINTS_TABLE, scoreRace } from './scoring.ts';
+import type { WeatherTimeline } from './weather.ts';
 
 const DT = 0.1;
 
@@ -329,5 +330,91 @@ describe('AI pace choice', () => {
 
   it('conserves under the safety car', () => {
     assert.equal(aiPaceMode({ ...calm, safetyCar: true, gapAhead: 0.5 }), 'conserve');
+  });
+});
+
+describe('weather in the race', () => {
+  /** Dry for the first `dryS` seconds, then steady rain of the given strength. */
+  function rainFrom(dryS: number, strength: number, untilS = 99_999): WeatherTimeline {
+    const rain = Array.from({ length: 400 }, (_, i) => (i * 30 >= dryS && i * 30 < untilS ? strength : 0));
+    return { stepS: 30, durationS: 400 * 30, rain };
+  }
+
+  function withWeather(weather: WeatherTimeline, laps = 20, seed = 1): RaceSim {
+    const track = TRACKS[0];
+    const teams = defaultTeams();
+    return new RaceSim({ track, teams, grid: runQualifying(track, teams, seed).grid, laps, seed, playerTeamId: null, weather });
+  }
+
+  it('runs a race whose timeline never rains exactly as a race with no weather at all', () => {
+    const plain = run(makeSim({ seed: 4 }));
+    const dry = run(withWeather(rainFrom(0, 0), 20, 4));
+    assert.deepEqual(
+      dry.results().map((r) => [r.carId, r.timeS]),
+      plain.results().map((r) => [r.carId, r.timeS]),
+    );
+  });
+
+  it('wets the track in the rain, slows the laps, and dries the racing line first', () => {
+    const sim = withWeather(rainFrom(400, 0.7, 1300), 30);
+    sim.start();
+    let peak = 0;
+    while (sim.time < 1300) {
+      sim.step(DT);
+      peak = Math.max(peak, sim.wetness);
+    }
+    assert.ok(peak > 0.6, `peak wetness ${peak}`);
+    while (sim.time < 1700) sim.step(DT);
+    assert.ok(sim.wetness < sim.offlineWetness, `line ${sim.wetness} against offline ${sim.offlineWetness}`);
+    const leader = sim.standings()[0];
+    const dryLap = leader.laps[2].time;
+    const wetLaps = leader.laps.filter((l) => !l.pit && l.lap > 8 && l.lap < 13).map((l) => l.time);
+    assert.ok(Math.min(...wetLaps) > dryLap + 3, `wet ${Math.min(...wetLaps)} against dry ${dryLap}`);
+  });
+
+  it('sends rival cars onto wet-weather tyres within a few laps of heavy rain, on different laps', () => {
+    const sim = withWeather(rainFrom(500, 0.8), 25);
+    sim.start();
+    const switchLap = new Map<string, number>();
+    let wetLap: number | null = null;
+    while (sim.phase !== 'finished') {
+      sim.step(DT);
+      const leaderLap = sim.standings()[0].lap;
+      if (wetLap === null && sim.wetness > 0.2) wetLap = leaderLap;
+      for (const car of sim.cars) {
+        if (!switchLap.has(car.id) && (car.tyre.compound === 'I' || car.tyre.compound === 'W')) switchLap.set(car.id, car.lap);
+      }
+    }
+    assert.ok(wetLap !== null);
+    const running = sim.cars.filter((c) => c.status !== 'out');
+    assert.ok(switchLap.size >= running.length * 0.9, `${switchLap.size} of ${running.length} switched`);
+    for (const [id, lap] of switchLap) assert.ok(lap <= wetLap + 4, `${id} switched on lap ${lap}, the line was wet on lap ${wetLap}`);
+    assert.ok(new Set(switchLap.values()).size >= 2, 'everyone pitted on the same lap');
+  });
+
+  it('starts wet when it is already raining, with rivals on wet-weather tyres', () => {
+    const sim = withWeather(rainFrom(0, 0.5), 10);
+    assert.ok(sim.wetness > 0.5, `starting wetness ${sim.wetness}`);
+    const onWetTyres = sim.cars.filter((c) => c.tyre.compound === 'I' || c.tyre.compound === 'W').length;
+    assert.equal(onWetTyres, sim.cars.length);
+  });
+
+  it('waives the two-compound rule for a car that has run intermediates', () => {
+    const teams = defaultTeams();
+    const id = `${teams[3].id}:0`;
+    const track = TRACKS[0];
+    const sim = new RaceSim({
+      track,
+      teams,
+      grid: runQualifying(track, teams, 1).grid,
+      laps: 7,
+      seed: 1,
+      playerTeamId: teams[3].id,
+      strategies: { [id]: { startCompound: 'I', stops: [] } },
+    });
+    run(sim);
+    const car = sim.carById(id)!;
+    assert.deepEqual(car.usedCompounds, ['I'], 'the car must run intermediates only for this to test the waiver');
+    assert.equal(car.penaltySeconds, 0);
   });
 });
