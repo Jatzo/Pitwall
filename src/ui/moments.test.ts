@@ -44,15 +44,26 @@ describe('key moments', () => {
     assert.equal(moment?.carId, mine.id);
   });
 
-  it('does not offer a safety car stop on tyres that are almost new', () => {
+  it('offers the safety car call on new tyres too, so a safety car is never silent', () => {
     const sim = startedSim();
     const watch = watchMoments(sim);
-    for (const car of sim.cars.filter((c) => c.isPlayer)) car.tyre.ageLaps = 1;
-    sim.scCount++;
-    assert.equal(nextMoment(sim, watch), null);
-    for (const car of sim.cars.filter((c) => c.isPlayer)) car.tyre.ageLaps = 3;
+    for (const car of sim.cars.filter((c) => c.isPlayer)) car.tyre.ageLaps = 0.5;
     sim.scCount++;
     assert.equal(nextMoment(sim, watch)?.kind, 'safetycar');
+  });
+
+  it('offers the safety car call on the first lap', () => {
+    const track = TRACKS[0];
+    const teams = defaultTeams();
+    const sim = new RaceSim({ track, teams, grid: runQualifying(track, teams, 3).grid, laps: 20, seed: 3, playerTeamId: teams[5].id });
+    sim.start();
+    for (let i = 0; i < 100; i++) sim.step(0.1);
+    const watch = watchMoments(sim);
+    const mine = sim.cars.filter((c) => c.isPlayer && c.status === 'running');
+    assert.ok(mine.length > 0 && mine.every((c) => c.lap === 0 && c.tyre.ageLaps < 1));
+    sim.scCount++;
+    assert.equal(nextMoment(sim, watch)?.kind, 'safetycar');
+    assert.equal(promptCars(sim, { kind: 'safetycar' }).length, mine.length);
   });
 
   it('stays quiet when no player car can still make a decision', () => {

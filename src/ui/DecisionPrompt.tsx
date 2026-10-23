@@ -5,7 +5,7 @@ import { TUNING } from '../engine/tuning.ts';
 import { COMPOUNDS, PIT_COMPOUNDS, bestClass, tyreClass } from '../engine/tyres.ts';
 import type { RaceCommand } from '../engine/types.ts';
 import { CLASS_NAMES, classCostLine } from './Conditions.tsx';
-import { promptCars } from './moments.ts';
+import { MIN_TYRE_AGE_FOR_SC_STOP, promptCars } from './moments.ts';
 import type { Moment } from './moments.ts';
 
 interface Props {
@@ -62,6 +62,9 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
             <div className="muted" style={{ fontSize: 12 }}>
               {next ? `Plan: stop on lap ${next.lap} for ${COMPOUNDS[next.compound].name.toLowerCase()}s.` : 'Plan: no more stops.'}
               {moment.kind !== 'safetycar' && ` A stop now rejoins about P${rejoin}.`}
+              {moment.kind === 'safetycar' &&
+                car.tyre.ageLaps < MIN_TYRE_AGE_FOR_SC_STOP &&
+                ' These tyres are barely used, so a stop gains little unless you want a different compound.'}
             </div>
             <div className="row wrap" style={{ gap: 6 }}>
               <span className="muted" style={{ fontSize: 12 }}>Box for</span>

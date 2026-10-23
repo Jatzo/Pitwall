@@ -24,8 +24,8 @@ export interface Moment {
   carId?: string;
 }
 
-/** Tyres younger than this gain nothing from a safety car stop. */
-const MIN_TYRE_AGE_FOR_SC_STOP = 2;
+/** Tyres younger than this gain little from a safety car stop; the prompt says so. */
+export const MIN_TYRE_AGE_FOR_SC_STOP = 2;
 
 /** Player cars that have a real pit call to make for this moment. */
 export function promptCars(sim: RaceSim, moment: Moment): CarState[] {
@@ -36,8 +36,8 @@ export function promptCars(sim: RaceSim, moment: Moment): CarState[] {
       car.status === 'running' &&
       // A stop needs the pit entry of a lap that is not the last.
       sim.totalLaps - car.lap > 1 &&
-      (moment.kind === 'rain' ||
-        (moment.kind === 'safetycar' ? car.tyre.ageLaps >= MIN_TYRE_AGE_FOR_SC_STOP : car.id === moment.carId)),
+      // Every safety car asks, even on fresh tyres: a safety car with no call reads as a fault.
+      (moment.kind === 'rain' || moment.kind === 'safetycar' || car.id === moment.carId),
   );
 }
 
