@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TRACKS } from '../data/tracks.ts';
+import { buildCircuit } from './circuitBuilder.ts';
 import { Track } from './track.ts';
 
 describe('Track', () => {
@@ -25,12 +26,25 @@ describe('Track', () => {
 
       it('keeps speeds in a plausible range', () => {
         const kph = Array.from(track.speed, (v) => v * 3.6);
-        assert.ok(Math.min(...kph) > 60, `min ${Math.min(...kph)}`);
+        // Real hairpins are taken at 55 to 70 km/h, so the floor sits just below that.
+        assert.ok(Math.min(...kph) > 50, `min ${Math.min(...kph)}`);
         assert.ok(Math.max(...kph) < 340, `max ${Math.max(...kph)}`);
+        const slowest = Math.min(...track.corners.map((c) => track.speedAt(c.s) * 3.6));
+        assert.ok(slowest < 100, `slowest corner ${slowest} km/h`);
+      });
+
+      it('has a real circuit corner count and no straight longer than the 2 km limit', () => {
+        assert.ok(track.corners.length >= 10 && track.corners.length <= 20, `corners ${track.corners.length}`);
+        let run = 0;
+        let longest = 0;
+        for (let i = 0; i < 2 * track.n; i++) {
+          run = track.curvature[i % track.n] === 0 ? run + track.step : 0;
+          longest = Math.max(longest, run);
+        }
+        assert.ok(longest < 2000, `longest straight ${longest} m`);
       });
 
       it('has numbered corners in order and at least one DRS zone', () => {
-        assert.ok(track.corners.length >= 5, `corners ${track.corners.length}`);
         track.corners.forEach((c, i) => assert.equal(c.number, i + 1));
         for (let i = 1; i < track.corners.length; i++) {
           assert.ok(track.corners[i].s > track.corners[i - 1].s);
@@ -54,6 +68,20 @@ describe('Track', () => {
       it('places the pit lane around the start line', () => {
         assert.ok(track.pitEntryS > track.length / 2);
         assert.ok(track.pitExitS < track.length / 2);
+      });
+
+      it('draws the pit lane clear of every other part of the circuit', () => {
+        let closest = Infinity;
+        for (let u = -track.pitEntryM; u <= track.pitExitM; u += 10) {
+          const p = track.pitLanePoint(u);
+          for (let i = 0; i < track.n; i += 2) {
+            const s = i * track.step;
+            const along = Math.min(Math.abs(s - u), Math.abs(s - u - track.length), Math.abs(s - u + track.length));
+            if (along < 400) continue;
+            closest = Math.min(closest, Math.hypot(p.x - track.x[i], p.y - track.y[i]));
+          }
+        }
+        assert.ok(closest > 80, `pit lane comes within ${closest} m of the track`);
       });
 
       it('starts on a near-straight, so the grid and pit lane are not in a corner', () => {
@@ -85,4 +113,38 @@ describe('Track', () => {
       });
     });
   }
+});
+
+describe('pit lane drawing', () => {
+  const track = new Track(TRACKS[0]);
+
+  it('stops each car at its own garage and joins the track at both ends', () => {
+    const garage = track.garageU(9, 10);
+    assert.ok(garage > 0);
+    assert.equal(track.pitDisplayU(0, garage), garage);
+    assert.equal(track.pitDisplayU(-track.pitEntryM, garage), -track.pitEntryM);
+    assert.equal(track.pitDisplayU(track.pitExitM, garage), track.pitExitM);
+    const entry = track.pitLanePoint(-track.pitEntryM);
+    const onTrack = track.pointAt(-track.pitEntryM);
+    assert.ok(Math.hypot(entry.x - onTrack.x, entry.y - onTrack.y) < 1e-6);
+  });
+
+  it('keeps the garages in order and inside the straight part of the lane', () => {
+    const slots = Array.from({ length: 10 }, (_, i) => track.garageU(i, 10));
+    for (let i = 1; i < slots.length; i++) assert.ok(slots[i] > slots[i - 1]);
+    assert.ok(slots[0] > -track.pitEntryM + 80 && slots[9] < track.pitExitM - 80);
+  });
+});
+
+describe('corner numbering', () => {
+  it('gives a hairpin drawn with two points one number, as real circuits do', () => {
+    const def = TRACKS.find((t) => t.id === 'silverwood')!;
+    const track = new Track(def);
+    const raw = buildCircuit(def.layout).corners;
+    const a = raw.find((c) => c.point === 6)!;
+    const b = raw.find((c) => c.point === 7)!;
+    assert.equal(Math.sign(a.angle), Math.sign(b.angle));
+    assert.ok(b.s - a.s < 70);
+    assert.equal(track.corners.filter((c) => c.s >= a.s - 1 && c.s <= b.s + 1).length, 1);
+  });
 });

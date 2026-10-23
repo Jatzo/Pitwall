@@ -11,7 +11,8 @@ function startedSim(): RaceSim {
   const teams = defaultTeams();
   const sim = new RaceSim({ track, teams, grid: runQualifying(track, teams, 3).grid, laps: 20, seed: 3, playerTeamId: teams[5].id });
   sim.start();
-  for (let i = 0; i < 2000; i++) sim.step(0.1);
+  // About three laps, so the tyres are old enough for a safety car stop to be worth offering.
+  for (let i = 0; i < 3000; i++) sim.step(0.1);
   return sim;
 }
 

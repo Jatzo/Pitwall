@@ -3,7 +3,7 @@
  * Prints the derived numbers for every circuit (average speed, speed range,
  * corners, DRS zones, how far the authored lap is from what the layout
  * allows) and draws docs/circuits.svg, a sheet of every layout in calendar
- * order, straight from the engine geometry.
+ * order with its pit lane, straight from the engine geometry.
  */
 
 import { writeFileSync } from 'node:fs';
@@ -36,7 +36,7 @@ SEASON_CALENDAR.forEach((id, k) => {
     return [ox + (p.x - b.minX) * scale, oy + (p.y - b.minY) * scale] as const;
   };
   let d = '';
-  for (let s = 0; s < t.length; s += 15) {
+  for (let s = 0; s < t.length; s += 5) {
     const [x, y] = at(s);
     d += `${s === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
   }
@@ -51,6 +51,12 @@ SEASON_CALENDAR.forEach((id, k) => {
     }
     body += `<path d="${z}" fill="none" stroke="#2fd27a" stroke-width="2.5" stroke-linecap="round"/>`;
   }
+  let pit = '';
+  for (let u = -t.pitEntryM; u <= t.pitExitM; u += 10) {
+    const p = t.pitLanePoint(u);
+    pit += `${u === -t.pitEntryM ? 'M' : 'L'}${(ox + (p.x - b.minX) * scale).toFixed(1)},${(oy + (p.y - b.minY) * scale).toFixed(1)}`;
+  }
+  body += `<path d="${pit}" fill="none" stroke="#2c3345" stroke-width="3" stroke-linecap="round"/>`;
   const [sx, sy] = at(0);
   body += `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="5" fill="#e10600"/>`;
   const tx = (k % COLS) * CELL_W + 20;

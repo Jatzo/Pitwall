@@ -1,14 +1,16 @@
 /**
  * Track geometry and speed profile.
  *
- * A circuit is authored as a handful of control points. We turn them into a
- * closed centripetal Catmull-Rom spline, resample it at a fixed spacing, derive
- * curvature, and compute a physically-motivated speed profile (cornering grip,
- * acceleration and braking limits). Everything the simulator needs - positions,
- * speeds, DRS zones, corners, sectors - comes from this one class.
+ * A circuit is authored as a layout of key points in metres with a corner
+ * radius at each (see circuitBuilder.ts). We sample it at a fixed spacing and
+ * compute a physically-motivated speed profile: cornering grip that rises with
+ * speed as downforce builds, plus acceleration and braking limits. Everything
+ * the simulator needs - positions, speeds, DRS zones, corners, sectors, the pit
+ * lane - comes from this one class.
  */
 
-export type Vec2 = readonly [number, number];
+import { buildCircuit } from './circuitBuilder.ts';
+import type { LayoutPoint } from './circuitBuilder.ts';
 
 export interface TrackDef {
   id: string;
@@ -16,16 +18,17 @@ export interface TrackDef {
   location: string;
   /** One line on what makes the circuit different, for the calendar. */
   summary?: string;
-  /** Closed loop of control points (arbitrary units; scaled to lengthM). */
-  controlPoints: readonly Vec2[];
+  /** Key points in metres, each with its corner radius. The lap starts halfway along the first edge. */
+  layout: readonly LayoutPoint[];
+  /** Lap length in metres; must match the layout to within a few metres. */
   lengthM: number;
   /**
    * Optional override for the reference lap time (s). By default it is derived
    * from the layout: the time a perfect, fuel-free car takes to lap it.
    */
   refLapS?: number;
-  /** Maximum lateral acceleration in m/s^2 (default 22, about 2.2 g). */
-  cornerAccel?: number;
+  /** Grip relative to a purpose-built circuit (default 1). */
+  grip?: number;
   /** Chance that rain falls at some point in a race here (0 to 1). */
   rainChance?: number;
   /** Tyre wear multiplier. 1 = average. */
@@ -58,52 +61,22 @@ export interface DrsZone {
 
 const SPACING_M = 5;
 const V_MAX = 86; // m/s, about 310 km/h
-const ACCEL = 6.0; // m/s^2 used for the speed profile
+// Traction-limited at low speed, power-limited above about 180 km/h. The race engine allows 9 m/s^2.
+const ACCEL = 9;
+const POWER = 450; // m^2/s^3: acceleration times speed
 const BRAKE = 40; // m/s^2
-
-function dist(a: Vec2, b: Vec2): number {
-  return Math.hypot(a[0] - b[0], a[1] - b[1]);
-}
+// Lateral grip a = GRIP_LOW + GRIP_AERO * v^2: about 2 g in a hairpin, over 4 g in a fast sweeper.
+const GRIP_LOW = 20;
+const GRIP_AERO = 0.0035;
+/** The pit lane runs this far from the track's centre line, on the outside of the lap. */
+export const PIT_LANE_OFFSET_M = 42;
+const PIT_TAPER_M = 80;
 
 function wrapPi(a: number): number {
   let r = a;
   while (r > Math.PI) r -= 2 * Math.PI;
   while (r < -Math.PI) r += 2 * Math.PI;
   return r;
-}
-
-/** Centripetal Catmull-Rom (Barry-Goldman form) for one segment p1 -> p2. */
-function centripetal(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, u: number): Vec2 {
-  const alpha = 0.5;
-  const t0 = 0;
-  const t1 = t0 + Math.max(dist(p0, p1), 1e-6) ** alpha;
-  const t2 = t1 + Math.max(dist(p1, p2), 1e-6) ** alpha;
-  const t3 = t2 + Math.max(dist(p2, p3), 1e-6) ** alpha;
-  const t = t1 + (t2 - t1) * u;
-
-  const mix = (a: Vec2, b: Vec2, ta: number, tb: number, tt: number): Vec2 => {
-    const w = (tt - ta) / (tb - ta);
-    return [a[0] * (1 - w) + b[0] * w, a[1] * (1 - w) + b[1] * w];
-  };
-  const a1 = mix(p0, p1, t0, t1, t);
-  const a2 = mix(p1, p2, t1, t2, t);
-  const a3 = mix(p2, p3, t2, t3, t);
-  const b1 = mix(a1, a2, t0, t2, t);
-  const b2 = mix(a2, a3, t1, t3, t);
-  return mix(b1, b2, t1, t2, t);
-}
-
-function sampleSpline(points: readonly Vec2[], perSegment: number): Vec2[] {
-  const m = points.length;
-  const out: Vec2[] = [];
-  for (let i = 0; i < m; i++) {
-    const p0 = points[(i - 1 + m) % m];
-    const p1 = points[i];
-    const p2 = points[(i + 1) % m];
-    const p3 = points[(i + 2) % m];
-    for (let k = 0; k < perSegment; k++) out.push(centripetal(p0, p1, p2, p3, k / perSegment));
-  }
-  return out;
 }
 
 export class Track {
@@ -130,26 +103,16 @@ export class Track {
   readonly pitEntryM: number;
   readonly pitExitM: number;
   readonly bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  /** +1 or -1: the side of the track, as a left-hand offset, that faces away from the infield. */
+  readonly outside: 1 | -1;
   private readonly overtake: Float64Array;
 
   constructor(def: TrackDef) {
     this.def = def;
+    const circuit = buildCircuit(def.layout);
 
-    // 1. Dense spline, scaled to the nominal length.
-    const raw = sampleSpline(def.controlPoints, 80);
-    let rawLen = 0;
-    for (let i = 0; i < raw.length; i++) rawLen += dist(raw[i], raw[(i + 1) % raw.length]);
-    const k = def.lengthM / rawLen;
-    const px = raw.map((p) => p[0] * k);
-    const py = raw.map((p) => p[1] * k);
-    const m = raw.length;
-    const cum = new Float64Array(m + 1);
-    for (let i = 1; i <= m; i++) {
-      cum[i] = cum[i - 1] + Math.hypot(px[i % m] - px[i - 1], py[i % m] - py[i - 1]);
-    }
-    const total = cum[m];
-
-    // 2. Uniform resample.
+    // 1. Uniform samples of the exact geometry.
+    const total = circuit.length;
     const n = Math.round(total / SPACING_M);
     const step = total / n;
     this.n = n;
@@ -157,42 +120,31 @@ export class Track {
     this.length = total;
     this.x = new Float64Array(n);
     this.y = new Float64Array(n);
-    let idx = 0;
-    for (let j = 0; j < n; j++) {
-      const target = j * step;
-      while (idx < m - 1 && cum[idx + 1] <= target) idx++;
-      const span = cum[idx + 1] - cum[idx] || 1;
-      const f = (target - cum[idx]) / span;
-      this.x[j] = px[idx] + (px[(idx + 1) % m] - px[idx]) * f;
-      this.y[j] = py[idx] + (py[(idx + 1) % m] - py[idx]) * f;
-    }
-
-    // 3. Heading and curvature.
     this.heading = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      const a = (i - 1 + n) % n;
-      const b = (i + 1) % n;
-      this.heading[i] = Math.atan2(this.y[b] - this.y[a], this.x[b] - this.x[a]);
-    }
     this.curvature = new Float64Array(n);
-    const w = 4;
     for (let i = 0; i < n; i++) {
-      const dh = wrapPi(this.heading[(i + w) % n] - this.heading[(i - w + n) % n]);
-      this.curvature[i] = dh / (2 * w * step);
+      const p = circuit.sample(i * step);
+      this.x[i] = p.x;
+      this.y[i] = p.y;
+      this.heading[i] = p.heading;
+      this.curvature[i] = p.kappa;
     }
+    this.outside = circuit.turning < 0 ? -1 : 1;
 
-    // 4. Speed profile.
-    const aLat = def.cornerAccel ?? 22;
+    // 2. Speed profile.
+    const grip = def.grip ?? 1;
+    const low = GRIP_LOW * grip;
+    const aero = GRIP_AERO * grip;
     const v = new Float64Array(n);
     for (let i = 0; i < n; i++) {
-      const kappa = Math.max(Math.abs(this.curvature[i]), 1e-6);
-      v[i] = Math.min(V_MAX, Math.sqrt(aLat / kappa));
+      const kappa = Math.abs(this.curvature[i]);
+      v[i] = kappa <= aero ? V_MAX : Math.min(V_MAX, Math.sqrt(low / (kappa - aero)));
     }
     for (let pass = 0; pass < 3; pass++) {
       for (let i = 0; i < 2 * n; i++) {
         const a = i % n;
         const b = (i + 1) % n;
-        v[b] = Math.min(v[b], Math.sqrt(v[a] * v[a] + 2 * ACCEL * step));
+        v[b] = Math.min(v[b], Math.sqrt(v[a] * v[a] + 2 * Math.min(ACCEL, POWER / Math.max(v[a], 1)) * step));
       }
       for (let i = 2 * n; i > 0; i--) {
         const a = (i - 1) % n;
@@ -209,7 +161,7 @@ export class Track {
     this.speed = v;
     this.refLap = refLap;
 
-    // 5. Bounds.
+    // 3. Bounds.
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -222,16 +174,33 @@ export class Track {
     }
     this.bounds = { minX, minY, maxX, maxY };
 
-    // 6. Sectors and pit lane.
+    // 4. Sectors and pit lane, which must sit on the start/finish straight.
     this.sectorLines = [total / 3, (2 * total) / 3];
     this.pitEntryM = def.pitLane?.entryM ?? 230;
     this.pitExitM = def.pitLane?.exitM ?? 300;
+    if (circuit.startStraight.before < this.pitEntryM || circuit.startStraight.after < this.pitExitM) {
+      throw new Error(
+        `${def.id}: the pit lane needs ${this.pitEntryM} m of straight before the line and ${this.pitExitM} m after, ` +
+          `but the layout has ${circuit.startStraight.before.toFixed(0)} m and ${circuit.startStraight.after.toFixed(0)} m`,
+      );
+    }
     this.pitEntryS = total - this.pitEntryM;
     this.pitExitS = this.pitExitM;
 
-    // 7. Features.
+    // 5. Features. A corner is a bend of 10 degrees or more that the car has to slow for.
+    // Two bends the same way within 70 m are one corner (a hairpin drawn with two points);
+    // a flick one way then the other is two, as a chicane is numbered on a real circuit.
     this.drsZones = this.findDrsZones();
-    this.corners = this.findCorners();
+    let top = 0;
+    for (let i = 0; i < n; i++) top = Math.max(top, v[i]);
+    const kept: { s: number; angle: number }[] = [];
+    for (const c of circuit.corners) {
+      if (Math.abs(c.angle) < 10 || this.speedAt(c.s) > 0.85 * top) continue;
+      const last = kept[kept.length - 1];
+      if (last && Math.sign(last.angle) === Math.sign(c.angle) && c.s - last.s < 70) continue;
+      kept.push(c);
+    }
+    this.corners = kept.map((c, i) => ({ number: i + 1, s: c.s }));
     this.overtake = this.buildOvertakeMap();
   }
 
@@ -303,18 +272,42 @@ export class Track {
     return `${d}Z`;
   }
 
-  /** Offset polyline for the pit lane (SVG path, open). */
-  pitLanePath(offsetM: number): string {
-    const startS = this.pitEntryS;
-    const total = this.pitEntryM + this.pitExitM;
+  /**
+   * A point on the pit lane, u metres from the start line (negative before it).
+   * The lane leaves the track at the entry, runs parallel on the outside, and rejoins at the exit.
+   */
+  pitLanePoint(u: number): TrackPoint {
+    const p = this.pointAt(u);
+    const fromEnd = Math.min(u + this.pitEntryM, this.pitExitM - u);
+    const k = Math.max(0, Math.min(1, fromEnd / PIT_TAPER_M));
+    const off = PIT_LANE_OFFSET_M * this.outside * k * k * (3 - 2 * k);
+    return { x: p.x + Math.sin(p.heading) * off, y: p.y - Math.cos(p.heading) * off, heading: p.heading };
+  }
+
+  /** The pit lane as an SVG path, entry to exit. */
+  pitLanePath(): string {
     let d = '';
-    for (let s = 0; s <= total; s += SPACING_M * 2) {
-      const p = this.pointAt(startS + s);
-      const ox = p.x + Math.sin(p.heading) * offsetM;
-      const oy = p.y - Math.cos(p.heading) * offsetM;
-      d += `${s === 0 ? 'M' : 'L'}${ox.toFixed(1)},${oy.toFixed(1)}`;
+    for (let u = -this.pitEntryM; u <= this.pitExitM; u += SPACING_M * 2) {
+      const p = this.pitLanePoint(u);
+      d += `${u === -this.pitEntryM ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`;
     }
     return d;
+  }
+
+  /** Where garage `slot` of `slots` sits along the pit lane, centred on the start line. */
+  garageU(slot: number, slots: number): number {
+    const spacing = Math.min(20, (this.pitEntryM + this.pitExitM - 2 * PIT_TAPER_M) / Math.max(1, slots));
+    return (slot - (slots - 1) / 2) * spacing;
+  }
+
+  /**
+   * Where to draw a car on the pit lane. The race counts every stop at the start
+   * line; `d` is the car's distance past it (negative on the way in). The map
+   * stretches each half of the lane so the car stops at its own garage instead.
+   */
+  pitDisplayU(d: number, garage: number): number {
+    if (d <= 0) return garage + (d * (garage + this.pitEntryM)) / this.pitEntryM;
+    return garage + (d * (this.pitExitM - garage)) / this.pitExitM;
   }
 
   private findDrsZones(): DrsZone[] {
@@ -343,7 +336,7 @@ export class Track {
     }
     if (runStart >= 0) runs.push({ start: (anchor + runStart) % n, len: n + 1 - runStart });
 
-    const minLen = 260 / step;
+    const minLen = 350 / step;
     const candidates = runs.filter((r) => r.len >= minLen).sort((a, b) => b.len - a.len);
     const wanted = length > 5000 && candidates[2] && candidates[2].len * step > 450 ? 3 : 2;
     const chosen = candidates.slice(0, wanted);
@@ -358,34 +351,6 @@ export class Track {
 
   private wrapLen(s: number): number {
     return this.wrap(s);
-  }
-
-  private findCorners(): Corner[] {
-    const { n, step, speed } = this;
-    const found: number[] = [];
-    const near = Math.round(150 / step);
-    const far = Math.round(400 / step);
-    for (let i = 0; i < n; i++) {
-      let isMin = true;
-      let hi = 0;
-      for (let d = -far; d <= far; d++) {
-        const vv = speed[(i + d + n) % n];
-        if (Math.abs(d) <= near && vv < speed[i]) {
-          isMin = false;
-          break;
-        }
-        if (vv > hi) hi = vv;
-      }
-      if (isMin && speed[i] < 0.8 * hi && Math.abs(this.curvature[i]) > 0.002) found.push(i);
-    }
-    const spaced: number[] = [];
-    const minGap = Math.round(60 / step);
-    for (const i of found) {
-      const last = spaced[spaced.length - 1];
-      if (last === undefined || i - last >= minGap) spaced.push(i);
-    }
-    if (spaced.length > 1 && spaced[0] + n - spaced[spaced.length - 1] < minGap) spaced.pop();
-    return spaced.map((i, idx) => ({ number: idx + 1, s: i * step }));
   }
 
   private buildOvertakeMap(): Float64Array {

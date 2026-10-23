@@ -1,5 +1,6 @@
 import { memo, useMemo } from 'react';
 import type { CarState, RaceSim } from '../engine/race.ts';
+import { PIT_LANE_OFFSET_M } from '../engine/track.ts';
 
 interface Props {
   sim: RaceSim;
@@ -29,14 +30,20 @@ function interp(prev: number, cur: number, alpha: number): number {
   return prev + (cur - prev) * alpha;
 }
 
-/** Static layer: asphalt, DRS zones, pit lane, start line, corner numbers. */
+/** Teams in grid order, which is also their order of garages along the pit lane. */
+function garageOrder(sim: RaceSim): string[] {
+  return [...new Set(sim.cars.map((c) => c.team.id))];
+}
+
+/** Static layer: asphalt, DRS zones, pit lane and garages, start line, corner numbers. */
 const TrackLayer = memo(function TrackLayer({ sim }: { sim: RaceSim }) {
   const t = sim.track;
   const geo = useMemo(() => {
     const w = t.bounds.maxX - t.bounds.minX;
     const h = t.bounds.maxY - t.bounds.minY;
     const size = Math.max(w, h);
-    const road = size * 0.026;
+    // About 16 m of asphalt at a typical circuit's size, so chicanes still read as two corners.
+    const road = Math.max(14, size * 0.011);
     const drs = t.drsZones.map((z) => {
       let d = '';
       const len = z.start <= z.end ? z.end - z.start : t.length - z.start + z.end;
@@ -54,7 +61,7 @@ const TrackLayer = memo(function TrackLayer({ sim }: { sim: RaceSim }) {
     };
     const corners = t.corners.map((c) => {
       const p = t.pointAt(c.s);
-      const off = road * 1.9;
+      const off = size * 0.03;
       // Put the number on the outside of the bend, so it never sits on the road.
       const ahead = t.pointAt(c.s + 40);
       let turn = ahead.heading - p.heading;
@@ -74,10 +81,22 @@ const TrackLayer = memo(function TrackLayer({ sim }: { sim: RaceSim }) {
       start: line(0, road * 0.9),
       sectors: t.sectorLines.map((s) => line(s, road * 0.9)),
       corners,
-      pit: t.pitLanePath(road * 1.7),
-      d: t.svgPath(2),
+      pit: t.pitLanePath(),
+      garages: garageOrder(sim).map((id, slot, all) => {
+        const p = t.pitLanePoint(t.garageU(slot, all.length));
+        const team = sim.cars.find((c) => c.team.id === id)!.team;
+        const out = (PIT_LANE_OFFSET_M * 0.55) * t.outside;
+        return {
+          id,
+          colour: team.colors.primary,
+          x: p.x + Math.sin(p.heading) * out,
+          y: p.y - Math.cos(p.heading) * out,
+          angle: (p.heading * 180) / Math.PI,
+        };
+      }),
+      d: t.svgPath(1),
     };
-  }, [t]);
+  }, [t, sim]);
 
   return (
     <g>
@@ -86,13 +105,29 @@ const TrackLayer = memo(function TrackLayer({ sim }: { sim: RaceSim }) {
       {geo.drs.map((d, i) => (
         <path key={i} d={d} fill="none" stroke="#2fd27a" strokeOpacity={0.55} strokeWidth={geo.road * 0.35} strokeLinecap="round" />
       ))}
-      <path d={geo.pit} fill="none" stroke="#2a3040" strokeWidth={geo.road * 0.55} strokeLinecap="round" />
+      <path d={geo.pit} fill="none" stroke="#05070b" strokeWidth={geo.road * 0.95} strokeLinecap="round" />
+      <path d={geo.pit} fill="none" stroke="#2c3345" strokeWidth={geo.road * 0.6} strokeLinecap="round" />
+      {geo.garages.map((g) => (
+        <rect
+          key={g.id}
+          x={-geo.road * 0.6}
+          y={-geo.road * 0.7}
+          width={geo.road * 1.2}
+          height={geo.road * 1.4}
+          rx={geo.road * 0.12}
+          fill={g.colour}
+          fillOpacity={0.8}
+          stroke="#05070b"
+          strokeWidth={geo.road * 0.1}
+          transform={`translate(${g.x.toFixed(1)} ${g.y.toFixed(1)}) rotate(${g.angle.toFixed(1)})`}
+        />
+      ))}
       {geo.sectors.map((l, i) => (
         <line key={i} {...l} stroke="#ffd75e" strokeOpacity={0.7} strokeWidth={geo.road * 0.12} />
       ))}
       <line {...geo.start} stroke="#fff" strokeWidth={geo.road * 0.3} strokeDasharray={`${geo.road * 0.3} ${geo.road * 0.3}`} />
       {geo.corners.map((c) => (
-        <text key={c.n} x={c.x} y={c.y} fontSize={geo.road * 0.95} fill="#6d7790" textAnchor="middle" dominantBaseline="central">
+        <text key={c.n} x={c.x} y={c.y} fontSize={geo.size * 0.022} fill="#7d87a0" textAnchor="middle" dominantBaseline="central">
           {c.n}
         </text>
       ))}
@@ -163,6 +198,7 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
   const r = size * 0.015;
 
   const order = sim.standings();
+  const garages = garageOrder(sim);
   const leader = order[0];
   // Draw selected and player cars last so they stay on top.
   const draw = [...sim.cars]
@@ -181,9 +217,19 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
       {draw.map((car) => {
         const dist = interp(car.prevDist, car.dist, sim.phase === 'racing' ? alpha : 1);
         const lat = interp(car.prevLat, car.lat, sim.phase === 'racing' ? alpha : 1);
-        const p = t.pointAt(dist);
-        const x = p.x + Math.sin(p.heading) * lat * (size * 0.0012);
-        const y = p.y - Math.cos(p.heading) * lat * (size * 0.0012);
+        let x: number;
+        let y: number;
+        if (car.status === 'pitLane' && car.pit) {
+          // On the pit lane: drawn travelling to the team's own garage, not on the racing line.
+          const slot = garages.indexOf(car.team.id);
+          const p = t.pitLanePoint(t.pitDisplayU(dist - car.pit.boxDist, t.garageU(slot, garages.length)));
+          x = p.x;
+          y = p.y;
+        } else {
+          const p = t.pointAt(dist);
+          x = p.x + Math.sin(p.heading) * lat * (size * 0.0012);
+          y = p.y - Math.cos(p.heading) * lat * (size * 0.0012);
+        }
         const label = showAllLabels || car.isPlayer || car.id === selectedId || car === leader;
         return (
           <Marker key={car.id} car={car} position={order.indexOf(car) + 1} x={x} y={y} r={r} selected={car.id === selectedId} label={label} onSelect={onSelect} />

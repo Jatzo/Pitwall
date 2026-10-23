@@ -32,7 +32,7 @@ export const TUNING = {
   drsAdvantage: 0.8,
   drsSpeedBoost: 1.035,
   /** Base overtaking probability per second. Raise for more passing. */
-  passRate: 0.1,
+  passRate: 0.125,
   passBoostFactor: 1.06,
   /** Safety car pace as a multiple of the reference lap time. */
   scFactor: 1.65,

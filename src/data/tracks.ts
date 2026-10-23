@@ -2,8 +2,10 @@ import { referenceRaceLaps } from '../engine/race.ts';
 import type { TrackDef } from '../engine/track.ts';
 
 /**
- * Ten fictional circuits. Control points are listed clockwise and the first
- * point sits in the middle of the start/finish straight. The pit lane is
+ * Ten fictional circuits. Each layout is a list of key points in metres with
+ * the radius of the corner at that point; the lap starts halfway between the
+ * first two points, on the start/finish straight. Corner counts, radii and
+ * straight lengths follow docs/research/circuit-design.md. The pit lane is
  * sized so a stop costs roughly 22 seconds, as in real life. New circuits are
  * added at the end so existing ids and indexes stay put; the season order is
  * set by SEASON_CALENDAR below.
@@ -16,13 +18,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Silverwood Circuit',
     location: 'Wexmoor',
     summary: 'An all-rounder: one long straight, a tight infield and nowhere to hide a weak car.',
-    controlPoints: [
-      [30, 80], [52, 80], [72, 80], [86, 76], [92, 64], [88, 52], [76, 46], [64, 50],
-      [56, 58], [48, 56], [46, 46], [54, 38], [66, 32], [70, 22], [60, 14], [44, 14],
-      [32, 22], [26, 34], [14, 40], [8, 52], [10, 66], [16, 78],
+    layout: [
+      [0, 0, 45], [1074, 0, 20], [1074, -269, 60], [1260, -425, 120], [1260, -663, 130], [1432, -834, 110],
+      [1432, -1229, 15], [1377, -1219, 18], [1182, -881, 50], [781, -846, 14], [763, -803, 14], [362, -768, 25],
+      [339, -1035, 40], [29, -1009, 160], [-137, -653, 220], [-105, -290, 200],
     ],
-    lengthM: 5300,
-    refLapS: 84,
+    lengthM: 5299,
+    refLapS: 101,
     rainChance: 0.35,
     tyreSeverity: 1.0,
     overtakingDifficulty: 1.0,
@@ -34,13 +36,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Costa Alta Street Circuit',
     location: 'Vellmar',
     summary: 'A street circuit with the walls close by. Passing is hard, so the grid matters.',
-    controlPoints: [
-      [36, 20], [60, 20], [84, 20], [92, 30], [86, 40], [70, 42], [60, 50], [70, 58],
-      [88, 62], [92, 74], [80, 84], [60, 82], [50, 72], [38, 78], [26, 88], [12, 82],
-      [8, 68], [18, 58], [14, 46], [8, 34], [12, 22],
+    layout: [
+      [118, 1064, 45], [1064, 1064, 16], [1064, 922, 18], [1359, 922, 18], [1359, 662, 60], [1182, 496, 40],
+      [1182, 295, 16], [969, 295, 22], [916, 254, 22], [650, 254, 16], [650, 496, 18], [449, 496, 15],
+      [449, 709, 18], [260, 709, 45], [260, 213, 15], [118, 177, 16], [71, 591, 60],
     ],
-    lengthM: 4900,
-    refLapS: 90,
+    lengthM: 4901,
+    refLapS: 119,
     rainChance: 0.15,
     tyreSeverity: 0.85,
     overtakingDifficulty: 1.5,
@@ -52,13 +54,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Monte Alba Autodrome',
     location: 'Alba Valley',
     summary: 'Fast, with two DRS zones and plenty of passing.',
-    controlPoints: [
-      [12, 56], [12, 40], [16, 24], [30, 13], [52, 10], [74, 11], [88, 16], [94, 28],
-      [90, 40], [80, 46], [84, 56], [90, 64], [86, 76], [72, 84], [60, 78], [56, 66],
-      [46, 62], [38, 70], [34, 82], [22, 88], [12, 80], [12, 70],
+    layout: [
+      [144, 1443, 50], [1371, 1443, 22], [1443, 1371, 22], [1948, 1227, 180], [2093, 866, 220], [2093, 649, 30],
+      [1660, 433, 16], [1602, 491, 16], [1371, 433, 90], [1155, 361, 90], [1010, 649, 130], [722, 751, 120],
+      [548, 433, 15], [476, 476, 18], [548, 938, 60], [375, 924, 25], [216, 1155, 110],
     ],
     lengthM: 5600,
-    refLapS: 86,
+    refLapS: 108,
     rainChance: 0.3,
     tyreSeverity: 1.15,
     overtakingDifficulty: 0.85,
@@ -70,13 +72,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Kestrel Ring',
     location: 'Hallow Heights',
     summary: 'Short and twisty. Passing is hard and two stops are common.',
-    controlPoints: [
-      [30, 86], [54, 86], [74, 82], [88, 70], [90, 54], [80, 44], [66, 46], [58, 36],
-      [66, 24], [52, 14], [34, 16], [22, 26], [26, 38], [14, 46], [8, 60], [14, 76],
-      [24, 84],
+    layout: [
+      [143, 1143, 40], [1285, 1143, 20], [1357, 857, 50], [1571, 714, 130], [1571, 357, 16], [1500, 314, 18],
+      [1214, 543, 45], [928, 471, 100], [785, 214, 30], [500, 286, 60], [571, 643, 140], [286, 743, 40],
+      [114, 928, 50],
     ],
     lengthM: 4400,
-    refLapS: 76,
+    refLapS: 88,
     rainChance: 0.4,
     tyreSeverity: 1.05,
     overtakingDifficulty: 1.25,
@@ -88,13 +90,14 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Hartwell Park',
     location: 'Hartwell',
     summary: 'The fastest lap of the year. Long straights reward engine power.',
-    controlPoints: [
-      [30, 88], [50, 88], [70, 88], [86, 87], [93, 80], [94, 64], [94, 46], [93, 30], [90, 22], [84, 20],
-      [80, 16], [82, 10], [76, 6], [60, 6], [44, 6], [30, 8], [22, 14], [26, 24], [18, 32], [10, 40],
-      [8, 52], [14, 62], [22, 66], [24, 74], [16, 80], [18, 86],
+    layout: [
+      [211, 1547, 60], [1758, 1547, 18], [1815, 1491, 18], [2110, 1266, 140], [2194, 985, 200], [2391, 774, 90],
+      [2391, 492, 16], [2321, 436, 16], [1899, 464, 90], [1618, 309, 130], [1266, 281, 40], [1224, 239, 40],
+      [844, 211, 120], [633, 352, 30], [563, 281, 30], [422, 492, 70], [633, 774, 150], [352, 985, 110],
+      [169, 1196, 70],
     ],
-    lengthM: 6300,
-    refLapS: 96,
+    lengthM: 6286,
+    refLapS: 111,
     rainChance: 0.2,
     tyreSeverity: 0.95,
     overtakingDifficulty: 0.85,
@@ -106,16 +109,15 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Port Calder Street Circuit',
     location: 'Calder Bay',
     summary: 'Slow right-angle corners between the walls. The hardest place to pass, light on tyres, and the chassis counts most.',
-    controlPoints: [
-      [40, 88], [62, 88], [78, 88], [84, 86], [86, 80], [86, 66], [84, 62], [78, 60], [64, 60], [60, 58],
-      [58, 54], [58, 40], [60, 36], [64, 34], [80, 34], [84, 32], [86, 28], [86, 16], [84, 12], [80, 10],
-      [50, 10], [46, 12], [44, 16], [44, 30], [42, 34], [38, 36], [22, 36], [18, 38], [16, 42], [16, 82],
-      [18, 86], [22, 88],
+    layout: [
+      [125, 1123, 45], [998, 1123, 15], [998, 873, 18], [1247, 873, 16], [1247, 624, 15], [1060, 624, 18],
+      [1060, 474, 20], [1247, 374, 15], [1247, 150, 15], [873, 150, 18], [873, 374, 15], [599, 374, 16],
+      [549, 412, 16], [374, 412, 15], [374, 187, 20], [125, 187, 45], [125, 686, 40],
     ],
-    lengthM: 4800,
-    refLapS: 100,
+    lengthM: 4799,
+    refLapS: 124,
     // Bumpy streets and close walls: less grip than a purpose-built circuit.
-    cornerAccel: 15,
+    grip: 0.85,
     rainChance: 0.25,
     tyreSeverity: 0.8,
     // Stuck cars keep trying every second, so a street circuit needs a high value to stay processional.
@@ -128,13 +130,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Ridgeback Raceway',
     location: 'Ridgeback Moor',
     summary: 'Long, loaded corners on an abrasive surface. Tyres wear faster here than anywhere else.',
-    controlPoints: [
-      [40, 88], [56, 88], [72, 87], [86, 80], [93, 66], [92, 50], [84, 40], [72, 38], [62, 44], [56, 54],
-      [46, 58], [36, 52], [34, 40], [42, 28], [56, 20], [66, 10], [50, 6], [30, 8], [16, 18], [8, 34],
-      [8, 54], [12, 74], [24, 87],
+    layout: [
+      [272, 1358, 60], [1494, 1358, 30], [1698, 1114, 200], [1630, 815, 260], [1834, 543, 200], [1698, 272, 45],
+      [1290, 163, 150], [951, 340, 100], [1087, 679, 15], [1012, 720, 18], [815, 611, 25], [761, 652, 25],
+      [543, 475, 160], [340, 407, 240], [204, 570, 20], [109, 516, 20], [136, 747, 120], [244, 1087, 150],
     ],
     lengthM: 5500,
-    refLapS: 85,
+    refLapS: 99,
     rainChance: 0.4,
     tyreSeverity: 1.5,
     overtakingDifficulty: 1.0,
@@ -146,12 +148,12 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Dunmore Circuit',
     location: 'Dunmore',
     summary: 'The shortest lap. Backmarkers arrive early and the field stays close.',
-    controlPoints: [
-      [40, 80], [60, 80], [76, 76], [84, 64], [80, 52], [68, 48], [60, 40], [66, 28], [60, 18], [44, 16],
-      [30, 22], [24, 36], [30, 48], [22, 58], [20, 70], [28, 78],
+    layout: [
+      [187, 995, 40], [1206, 995, 18], [1206, 771, 60], [1393, 597, 140], [1393, 323, 15], [1324, 280, 16],
+      [1094, 522, 45], [771, 522, 120], [597, 647, 30], [522, 373, 60], [249, 311, 50], [137, 647, 150],
     ],
-    lengthM: 3900,
-    refLapS: 66,
+    lengthM: 3901,
+    refLapS: 79,
     rainChance: 0.3,
     tyreSeverity: 0.85,
     overtakingDifficulty: 1.2,
@@ -163,13 +165,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Sable Coast Autodrome',
     location: 'Sable Coast',
     summary: 'A long back straight and the easiest passing on the calendar.',
-    controlPoints: [
-      [30, 80], [50, 80], [70, 80], [86, 76], [92, 66], [86, 56], [74, 54], [66, 46], [70, 36], [84, 30],
-      [92, 20], [86, 10], [70, 8], [50, 8], [30, 8], [14, 12], [8, 24], [14, 36], [24, 42], [22, 54],
-      [12, 62], [12, 74], [20, 80],
+    layout: [
+      [146, 1318, 40], [1391, 1318, 20], [1830, 1098, 80], [1830, 805, 120], [1976, 439, 15], [1903, 381, 18],
+      [1684, 483, 16], [1625, 439, 16], [1244, 439, 140], [1025, 556, 25], [966, 512, 25], [586, 439, 90],
+      [293, 439, 35], [176, 659, 140], [512, 878, 40], [556, 1025, 30], [293, 1098, 50],
     ],
-    lengthM: 5400,
-    refLapS: 86,
+    lengthM: 5399,
+    refLapS: 109,
     rainChance: 0.2,
     tyreSeverity: 1.0,
     overtakingDifficulty: 0.75,
@@ -181,13 +183,13 @@ export const TRACKS: readonly TrackDef[] = [
     name: 'Vennholt Ring',
     location: 'Vennholt',
     summary: 'Tight and technical, one corner after another. Aero and chassis matter more than power.',
-    controlPoints: [
-      [36, 86], [56, 86], [72, 84], [80, 74], [74, 64], [82, 54], [92, 46], [88, 34], [76, 30], [70, 20],
-      [58, 12], [44, 16], [40, 28], [30, 32], [20, 24], [10, 32], [12, 46], [24, 52], [28, 62], [18, 70],
-      [16, 80], [24, 86],
+    layout: [
+      [146, 1245, 35], [1245, 1245, 20], [1245, 1025, 45], [1435, 908, 110], [1435, 615, 25], [1201, 615, 30],
+      [1113, 410, 110], [1318, 234, 60], [1289, 88, 16], [1215, 73, 18], [879, 322, 35], [659, 220, 50],
+      [439, 381, 50], [556, 659, 120], [264, 820, 80], [117, 952, 35],
     ],
-    lengthM: 4700,
-    refLapS: 86,
+    lengthM: 4699,
+    refLapS: 100,
     rainChance: 0.35,
     tyreSeverity: 1.1,
     overtakingDifficulty: 1.3,
