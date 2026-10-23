@@ -43,9 +43,11 @@ export const TUNING = {
   pitDecel: 10,
   maxAccel: 9,
   maxBrake: 40,
-  /** Expected race incidents for the whole field (before safety-car odds). */
+  /** Length of a full-distance race. Hazard rates are set per race of this length. */
+  referenceRaceKm: 305,
+  /** Expected race incidents for the whole field over a full-distance race (before safety-car odds). */
   incidentsPerRace: 0.35,
-  /** Failure probability per race for a car rated 0 reliability. */
+  /** Failure probability per full-distance race for a car rated 0 reliability. */
   failureAtZeroReliability: 0.35,
   /** Planner's estimate of time lost in the pits (seconds). */
   pitLossPlan: 23,

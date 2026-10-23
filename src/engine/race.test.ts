@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { defaultTeams } from '../data/teams.ts';
 import { TRACKS } from '../data/tracks.ts';
 import { runQualifying } from './qualifying.ts';
-import { RaceSim, TUNING, carId } from './race.ts';
+import { RaceSim, TUNING, carId, incidentRatePerSecond, referenceRaceLaps } from './race.ts';
 import type { RaceConfig } from './race.ts';
 import { POINTS_TABLE, scoreRace } from './scoring.ts';
 
@@ -219,6 +219,36 @@ describe('race simulation', () => {
     assert.ok(gaps.every((g) => g === null || g >= 0));
     const finite = gaps.filter((g): g is number => g !== null);
     for (let i = 1; i < finite.length; i++) assert.ok(finite[i] >= finite[i - 1] - 0.5);
+  });
+
+  it('keeps the mechanical failure risk per second the same in short and long races', () => {
+    const short = makeSim({ laps: 20 });
+    const long = makeSim({ laps: referenceRaceLaps(TRACKS[0]) });
+    for (const car of short.cars) {
+      assert.equal(car.failureRate, long.carById(car.id)!.failureRate);
+    }
+  });
+
+  it('scales race incidents with the square root of race distance', () => {
+    const full = referenceRaceLaps(TRACKS[0]);
+    const lap = TRACKS[0].refLapS!;
+    const expected = (laps: number) => incidentRatePerSecond(laps, full, lap) * laps * lap;
+    assert.ok(Math.abs(expected(full) - TUNING.incidentsPerRace) < 1e-9);
+    assert.ok(Math.abs(expected(full / 4) - TUNING.incidentsPerRace / 2) < 1e-9);
+  });
+
+  it('reports finished cars by the difference in finishing time', () => {
+    const sim = run(makeSim({ seed: 5 }));
+    const order = sim.standings().filter((c) => c.finishTime !== null);
+    for (let i = 1; i < order.length; i++) {
+      if (order[i].lap !== order[i - 1].lap) continue;
+      const expected = order[i].finishTime! + order[i].penaltySeconds - (order[i - 1].finishTime! + order[i - 1].penaltySeconds);
+      assert.equal(sim.gapToAhead(order[i]), expected);
+    }
+    const last = order[order.length - 1];
+    if (last.lap === order[0].lap) {
+      assert.equal(sim.gapToLeader(last).seconds, last.finishTime! + last.penaltySeconds - order[0].finishTime! - order[0].penaltySeconds);
+    }
   });
 
   it('lets a safety car period bunch the field and then restart', () => {

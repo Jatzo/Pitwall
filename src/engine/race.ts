@@ -187,6 +187,22 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
+/** Laps in a full-distance race at this circuit (about 305 km). */
+export function referenceRaceLaps(track: TrackDef): number {
+  return Math.ceil((TUNING.referenceRaceKm * 1000) / track.lengthM);
+}
+
+/**
+ * Expected race incidents per second of racing. The total for a race grows
+ * with the square root of its distance, so a short race keeps some of a full
+ * race's drama without packing a full race's worth of crashes into a third of
+ * the laps.
+ */
+export function incidentRatePerSecond(laps: number, fullLaps: number, refLapS: number): number {
+  const incidents = TUNING.incidentsPerRace * Math.sqrt(laps / fullLaps);
+  return incidents / (laps * refLapS);
+}
+
 /** Did a point moving from position a to b (both in [0,L)) cross `line`? */
 function crossed(a: number, b: number, line: number): boolean {
   if (b >= a) return a < line && line <= b;
@@ -250,9 +266,10 @@ export class RaceSim {
     const form = rng.normal(0, TUNING.formSigma);
     const wearFactor =
       (1.1 - (driver.ratings.tyreMgmt / 100) * 0.25) * (1.1 - (team.car.chassis / 100) * 0.2);
-    const raceSeconds = this.totalLaps * track.refLap;
+    // Failure risk is per second of a full-distance race, so it does not rise in short races.
+    const referenceSeconds = referenceRaceLaps(track.def) * track.refLap;
     const failureRate =
-      (((100 - team.car.reliability) / 100) * TUNING.failureAtZeroReliability) / raceSeconds;
+      (((100 - team.car.reliability) / 100) * TUNING.failureAtZeroReliability) / referenceSeconds;
     const isPlayer = team.id === cfg.playerTeamId;
 
     const car: CarState = {
@@ -466,7 +483,7 @@ export class RaceSim {
   private updateRaceControl(dt: number): void {
     if (this.raceOver || this.sc.active) return;
     if (this.leaderLap() >= this.totalLaps - 2) return;
-    const perSecond = TUNING.incidentsPerRace / (this.totalLaps * this.track.refLap);
+    const perSecond = incidentRatePerSecond(this.totalLaps, referenceRaceLaps(this.track.def), this.track.refLap);
     const startMultiplier = this.time < 30 ? 25 : 1;
     if (!this.eventRng.chance(perSecond * startMultiplier * dt)) return;
 
@@ -998,8 +1015,8 @@ export class RaceSim {
     return order;
   }
 
-  /** Seconds between `behind` and the car in front of it, or null if unknown. */
-  private timeBetween(behind: CarState, ahead: CarState): number | null {
+  /** Seconds `behind` needs to reach where `ahead` is now, or null if unknown. */
+  timeBetween(behind: CarState, ahead: CarState): number | null {
     const d = behind.dist;
     if (d < 0) return null;
     const idx = Math.floor(d / CP_LEN);
@@ -1014,21 +1031,33 @@ export class RaceSim {
     return Math.max(0, this.time - tAhead);
   }
 
+  /**
+   * Gap between two classified cars. Once both have taken the flag it is the
+   * difference in finishing time, because cars slow down and bunch up on the
+   * lap after the line and the track gap stops meaning anything.
+   */
+  private classifiedGap(car: CarState, ahead: CarState): number | null {
+    if (car.finishTime !== null && ahead.finishTime !== null && car.lap === ahead.lap) {
+      return car.finishTime + car.penaltySeconds - (ahead.finishTime + ahead.penaltySeconds);
+    }
+    return this.timeBetween(car, ahead);
+  }
+
   /** Gap (s) to the car directly ahead in the classification. */
   gapToAhead(car: CarState): number | null {
     const order = this.standings();
     const i = order.indexOf(car);
     if (i <= 0 || car.status === 'out') return null;
-    return this.timeBetween(car, order[i - 1]);
+    return this.classifiedGap(car, order[i - 1]);
   }
 
   /** Gap (s) to the leader, or the number of laps down. */
   gapToLeader(car: CarState): { seconds: number | null; lapsDown: number } {
     const lead = this.standings()[0];
     if (!lead || lead === car) return { seconds: 0, lapsDown: 0 };
-    const lapsDown = Math.floor((lead.dist - car.dist) / this.track.length);
+    const lapsDown = car.finishTime !== null ? lead.lap - car.lap : Math.floor((lead.dist - car.dist) / this.track.length);
     if (lapsDown >= 1) return { seconds: null, lapsDown };
-    return { seconds: this.timeBetween(car, lead), lapsDown: 0 };
+    return { seconds: this.classifiedGap(car, lead), lapsDown: 0 };
   }
 
   /** Final classification (valid once the race is finished). */
