@@ -116,6 +116,25 @@ export function teamStandings(results: readonly RaceRecord[], teams: readonly Te
   return [...byTeam.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || a.teamId.localeCompare(b.teamId));
 }
 
+export interface RoundSummary {
+  winnerCarId: string | null;
+  /** Best classified finish of the player's two cars, or null if neither finished. */
+  playerBest: number | null;
+  playerPoints: number;
+}
+
+/** What the calendar shows for a finished round. */
+export function roundSummary(race: RaceRecord, playerTeamId: string): RoundSummary {
+  const winner = race.rows.find((r) => r.position === 1 && r.finished);
+  const mine = race.rows.filter((r) => r.carId.startsWith(`${playerTeamId}:`));
+  const finished = mine.filter((r) => r.finished).map((r) => r.position);
+  return {
+    winnerCarId: winner?.carId ?? null,
+    playerBest: finished.length > 0 ? Math.min(...finished) : null,
+    playerPoints: mine.reduce((sum, r) => sum + r.points, 0),
+  };
+}
+
 /** Seed for a given round so every race weekend is reproducible. */
 export function raceSeed(career: Career, round: number): number {
   return (career.seed + round * 7919) >>> 0;

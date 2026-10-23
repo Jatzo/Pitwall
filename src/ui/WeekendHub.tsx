@@ -12,6 +12,7 @@ import type { Career } from '../state/season.ts';
 import { PlanEditor } from './PlanEditor.tsx';
 import { Standings } from './Standings.tsx';
 import { TeamLogo } from './TeamLogo.tsx';
+import { TrackOutline } from './TrackOutline.tsx';
 
 export interface RaceSetup {
   trackId: string;
@@ -25,6 +26,7 @@ interface Props {
   career: Career;
   teams: TeamDef[];
   onStart: (setup: RaceSetup) => void;
+  onCalendar: () => void;
 }
 
 const LENGTHS = [
@@ -34,25 +36,7 @@ const LENGTHS = [
   { pct: 1, label: 'Full distance' },
 ];
 
-function TrackPreview({ trackId }: { trackId: string }) {
-  const geo = useMemo(() => {
-    const t = new Track(trackById(trackId));
-    const pad = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY) * 0.06;
-    const w = t.bounds.maxX - t.bounds.minX + pad * 2;
-    const h = t.bounds.maxY - t.bounds.minY + pad * 2;
-    return { t, vb: `${t.bounds.minX - pad} ${t.bounds.minY - pad} ${w} ${h}`, road: Math.max(w, h) * 0.022 };
-  }, [trackId]);
-  const sf = geo.t.pointAt(0);
-  return (
-    <svg viewBox={geo.vb} style={{ width: '100%', height: 230 }} role="img" aria-label="Circuit layout">
-      <path d={geo.t.svgPath(3)} fill="none" stroke="#05070b" strokeWidth={geo.road * 1.5} strokeLinejoin="round" />
-      <path d={geo.t.svgPath(3)} fill="none" stroke="#4a5470" strokeWidth={geo.road} strokeLinejoin="round" />
-      <circle cx={sf.x} cy={sf.y} r={geo.road * 0.9} fill="#e10600" />
-    </svg>
-  );
-}
-
-export function WeekendHub({ career, teams, onStart }: Props) {
+export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
   const round = currentRound(career);
   const trackDef = trackById(career.calendar[round]);
   const fullLaps = fullRaceLaps(trackDef);
@@ -94,6 +78,7 @@ export function WeekendHub({ career, teams, onStart }: Props) {
           <h2 style={{ fontSize: 26 }}>{trackDef.name}</h2>
           <div className="muted">{trackDef.location}</div>
         </div>
+        <button className="btn" onClick={onCalendar}>Season calendar</button>
         <TeamLogo team={playerTeam} size={44} />
         <div>
           <b>{playerTeam.name}</b>
@@ -105,7 +90,7 @@ export function WeekendHub({ career, teams, onStart }: Props) {
         <div className="stack">
           <div className="panel">
             <h3>Circuit</h3>
-            <TrackPreview trackId={trackDef.id} />
+            <TrackOutline track={geom} height={230} />
             <div className="trackinfo" style={{ marginTop: 8 }}>
               <div><b>{(geom.length / 1000).toFixed(2)} km</b><span>Lap length</span></div>
               <div><b>{formatLap(geom.refLap)}</b><span>Reference lap</span></div>

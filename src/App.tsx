@@ -8,6 +8,7 @@ import type { TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
 import { isSeasonOver, newCareer, recordRace } from './state/season.ts';
 import type { Career } from './state/season.ts';
+import { Calendar } from './ui/Calendar.tsx';
 import { RaceScreen } from './ui/RaceScreen.tsx';
 import { ResultsScreen } from './ui/ResultsScreen.tsx';
 import { Standings } from './ui/Standings.tsx';
@@ -22,6 +23,7 @@ type Screen =
   | { name: 'race'; config: RaceConfig; key: number }
   | { name: 'results'; rows: ScoredRow[]; trackId: string; laps: number }
   | { name: 'season' }
+  | { name: 'calendar'; back: 'hub' | 'season' }
   | { name: 'teams' };
 
 function Menu({
@@ -166,7 +168,9 @@ export function App() {
       );
       break;
     case 'hub':
-      body = career ? <WeekendHub career={career} teams={teams} onStart={startRace} /> : null;
+      body = career ? (
+        <WeekendHub career={career} teams={teams} onStart={startRace} onCalendar={() => setScreen({ name: 'calendar', back: 'hub' })} />
+      ) : null;
       break;
     case 'race':
       body = <RaceScreen key={screen.key} config={screen.config} onFinish={finishRace} />;
@@ -188,12 +192,18 @@ export function App() {
         <div className="page stack">
           <h2 style={{ fontSize: 26 }}>Season complete</h2>
           <Standings results={career.results} teams={teams} playerTeamId={career.playerTeamId} />
-          <div>
+          <div className="row">
             <button className="btn primary" onClick={() => setScreen({ name: 'menu' })}>Back to menu</button>
+            <button className="btn" onClick={() => setScreen({ name: 'calendar', back: 'season' })}>Season calendar</button>
           </div>
         </div>
       ) : null;
       break;
+    case 'calendar': {
+      const back = screen.back;
+      body = career ? <Calendar career={career} teams={teams} onBack={() => setScreen(back === 'hub' ? { name: 'hub' } : { name: 'season' })} /> : null;
+      break;
+    }
     case 'teams':
       body = (
         <TeamEditor
