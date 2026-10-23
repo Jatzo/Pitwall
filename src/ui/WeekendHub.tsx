@@ -6,6 +6,9 @@ import { runQualifying } from '../engine/qualifying.ts';
 import type { QualifyingResult } from '../engine/qualifying.ts';
 import { RaceSim } from '../engine/race.ts';
 import { Track } from '../engine/track.ts';
+import { PIT_COMPOUNDS, bestClass } from '../engine/tyres.ts';
+import { RAIN_THRESHOLD, forecast, generateWeather, rainAt } from '../engine/weather.ts';
+import type { WeatherTimeline } from '../engine/weather.ts';
 import type { StrategyPlan, TeamDef } from '../engine/types.ts';
 import { currentRound, raceSeed } from '../state/season.ts';
 import type { Career } from '../state/season.ts';
@@ -20,6 +23,7 @@ export interface RaceSetup {
   grid: string[];
   plans: Record<string, StrategyPlan>;
   seed: number;
+  weather: WeatherTimeline;
 }
 
 interface Props {
@@ -48,7 +52,18 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
   const [quali, setQuali] = useState<QualifyingResult | null>(null);
   const [plans, setPlans] = useState<Record<string, StrategyPlan>>({});
 
-  const suggest = (i: 0 | 1): StrategyPlan => RaceSim.suggestPlan(trackDef, playerTeam, playerTeam.drivers[i], laps, null);
+  const seed = raceSeed(career, round);
+  const rainChance = trackDef.rainChance ?? 0;
+  // The weather is decided with the round, so the forecast here and the race share it.
+  const durationS = laps * geom.refLap * 1.08;
+  const weather = useMemo(() => generateWeather(seed, rainChance, durationS), [seed, rainChance, durationS]);
+  const wetStart = rainAt(weather, 0) > RAIN_THRESHOLD;
+  const outlook = forecast(weather, seed, rainChance, 0, 4, durationS / 4);
+
+  const suggest = (i: 0 | 1): StrategyPlan => {
+    if (wetStart) return { startCompound: bestClass(Math.min(1, rainAt(weather, 0) * 1.2)) === 'wet' ? 'W' : 'I', stops: [] };
+    return RaceSim.suggestPlan(trackDef, playerTeam, playerTeam.drivers[i], laps, null);
+  };
 
   // Reset the weekend whenever the round, race length or edited teams change.
   useEffect(() => {
@@ -56,7 +71,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
   }, [round, teams]);
   useEffect(() => {
     setPlans({ [`${playerTeam.id}:0`]: suggest(0), [`${playerTeam.id}:1`]: suggest(1) });
-  }, [round, laps, playerTeam.id]);
+  }, [round, laps, playerTeam.id, wetStart]);
 
   const byId = new Map<string, { team: TeamDef; name: string }>();
   for (const team of teams) team.drivers.forEach((d, i) => byId.set(`${team.id}:${i}`, { team, name: d.name }));
@@ -65,7 +80,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
 
   const start = () => {
     if (!quali) return;
-    onStart({ trackId: trackDef.id, laps, grid: quali.grid, plans, seed: raceSeed(career, round) });
+    onStart({ trackId: trackDef.id, laps, grid: quali.grid, plans, seed, weather });
   };
 
   return (
@@ -114,6 +129,27 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
               <span className="muted num">{laps} laps</span>
             </div>
             {quali && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Locked once qualifying has run.</div>}
+          </div>
+
+          <div className="panel">
+            <h3>Weather forecast</h3>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+              It rains at some point in about {Math.round(rainChance * 100)}% of races here. Chance of rain in each quarter of this race:
+            </div>
+            <div className="forecast" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }} role="list" aria-label="Rain forecast by quarter of the race">
+              {outlook.map((w, i) => (
+                <div key={w.fromS} role="listitem" aria-label={`Quarter ${i + 1}: ${Math.round(w.chance * 100)}% chance of rain`}>
+                  <i style={{ opacity: 0.15 + 0.85 * w.chance }} />
+                  <span className="num">{Math.round(w.chance * 100)}%</span>
+                  <span className="muted">Q{i + 1}</span>
+                </div>
+              ))}
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+              {wetStart
+                ? 'It is raining at the start: intermediates or full wets can be chosen as the start tyre.'
+                : 'Forecasts further ahead are less certain. In the race, the next half hour is shown in 5-minute steps.'}
+            </div>
           </div>
 
           <Standings results={career.results} teams={teams} playerTeamId={career.playerTeamId} />
@@ -176,6 +212,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
                   rates={wearRatesFor(trackDef, playerTeam, driver)}
                   onChange={(p) => setPlans((prev) => ({ ...prev, [id]: p }))}
                   onSuggest={() => setPlans((prev) => ({ ...prev, [id]: suggest(i) }))}
+                  startOptions={wetStart ? PIT_COMPOUNDS : undefined}
                 />
               </div>
             );

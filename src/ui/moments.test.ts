@@ -62,4 +62,28 @@ describe('key moments', () => {
     sim.scCount++;
     assert.equal(nextMoment(sim, watch), null);
   });
+
+  it('reports rain starting once, while it keeps raining', () => {
+    const sim = startedSim();
+    const watch = watchMoments(sim);
+    sim.rain = 0.4;
+    assert.equal(nextMoment(sim, watch)?.kind, 'rain');
+    assert.equal(nextMoment(sim, watch), null);
+  });
+
+  it('tells a player car once when another class of tyre suits the conditions', () => {
+    const sim = startedSim();
+    const watch = watchMoments(sim);
+    const mine = sim.cars.filter((c) => c.isPlayer && c.status === 'running');
+    for (const car of mine) car.tyre.ageLaps = 1;
+    sim.wetness = 0.35;
+    const moment = nextMoment(sim, watch);
+    assert.equal(moment?.kind, 'conditions');
+    assert.ok(mine.some((c) => c.id === moment?.carId));
+    // The other player car gets its own moment next, then nothing more until the advice changes.
+    const second = nextMoment(sim, watch);
+    assert.equal(second?.kind, 'conditions');
+    assert.notEqual(second?.carId, moment?.carId);
+    assert.equal(nextMoment(sim, watch), null);
+  });
 });

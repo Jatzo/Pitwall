@@ -5,6 +5,7 @@ import { TUNING } from '../engine/tuning.ts';
 import { CLIFF_START, COMPOUNDS, PIT_COMPOUNDS } from '../engine/tyres.ts';
 import type { EngineMode, PaceMode, RaceCommand, StrategyPlan } from '../engine/types.ts';
 import { TeamLogo } from './TeamLogo.tsx';
+import { Conditions } from './Conditions.tsx';
 import { PlanEditor } from './PlanEditor.tsx';
 
 interface Props {
@@ -124,6 +125,8 @@ export function CarPanel({ sim, car, dispatch }: Props) {
           )}
         </div>}
       </div>
+
+      <Conditions sim={sim} />
 
       {mine && !out && (
         <>

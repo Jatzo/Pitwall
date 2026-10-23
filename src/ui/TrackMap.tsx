@@ -175,6 +175,9 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
   return (
     <svg viewBox={vb} preserveAspectRatio="xMidYMid meet" role="img" aria-label={`Live map of ${t.def.name}`}>
       <TrackLayer sim={sim} />
+      {sim.rain > 0 && (
+        <rect x={t.bounds.minX - pad} y={t.bounds.minY - pad} width={t.bounds.maxX - t.bounds.minX + pad * 2} height={t.bounds.maxY - t.bounds.minY + pad * 2} fill="#3b8bff" opacity={0.05 + 0.12 * sim.rain} pointerEvents="none" />
+      )}
       {draw.map((car) => {
         const dist = interp(car.prevDist, car.dist, sim.phase === 'racing' ? alpha : 1);
         const lat = interp(car.prevLat, car.lat, sim.phase === 'racing' ? alpha : 1);

@@ -130,6 +130,7 @@ export function App() {
       seed: setup.seed,
       playerTeamId: career.playerTeamId,
       strategies: setup.plans,
+      weather: setup.weather,
     };
     setScreen({ name: 'race', config, key: Date.now() });
   };
