@@ -55,8 +55,7 @@ export function TimingTower({ sim, selectedId, onSelect }: Props) {
       </div>
       <div className="trow thead">
         <span className="pos">P</span>
-        <span />
-        <span>Driver</span>
+        <span style={{ gridColumn: 'span 2' }}>Driver</span>
         <span className="r">{mode === 'interval' ? 'Int' : 'Gap'}</span>
         <span className="r">Last</span>
         <span>Tyre</span>
@@ -67,6 +66,7 @@ export function TimingTower({ sim, selectedId, onSelect }: Props) {
         const st = statusText(car);
         let gap = '--';
         if (st === 'OUT') gap = 'OUT';
+        else if (st === 'PIT') gap = 'PIT';
         else if (i === 0) gap = car.status === 'finished' ? 'WIN' : 'Leader';
         else if (mode === 'interval') {
           const g = sim.gapToAhead(car);
@@ -83,12 +83,22 @@ export function TimingTower({ sim, selectedId, onSelect }: Props) {
           <div
             key={car.id}
             className={`trow ${car.id === selectedId ? 'sel' : ''} ${car.isPlayer ? 'mine' : ''} ${car.status === 'out' ? 'out' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-pressed={car.id === selectedId}
+            aria-label={`${car.driver.name}, ${car.status === 'out' ? 'retired' : `P${i + 1}`}`}
             onClick={() => onSelect(car.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect(car.id);
+              }
+            }}
           >
             <span className="pos num">{car.status === 'out' ? '' : i + 1}</span>
             <span className="swatch" style={{ background: car.team.colors.primary }} />
             <span className="code">{car.driver.code}</span>
-            <span className="num" style={{ textAlign: 'right' }}>{gap}</span>
+            <span className={`num ${st === 'PIT' ? 'warn' : ''}`} style={{ textAlign: 'right' }}>{gap}</span>
             <span className={`num ${isBest ? 'purple' : isPb ? 'good' : ''}`} style={{ textAlign: 'right' }}>
               {car.lastLap !== null ? formatLap(car.lastLap) : '--'}
             </span>

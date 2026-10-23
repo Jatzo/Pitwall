@@ -23,12 +23,13 @@ export function formatSector(seconds: number | null): string {
   return seconds.toFixed(3);
 }
 
-/** Total race time, e.g. "1:24:36.512". */
+/** Total race time, e.g. "1:24:36.512", or "33:07.424" under an hour. */
 export function formatRaceTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds - h * 3600) / 60);
   const s = seconds - h * 3600 - m * 60;
-  return `${h}:${String(m).padStart(2, '0')}:${s.toFixed(3).padStart(6, '0')}`;
+  const rest = s.toFixed(3).padStart(6, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`;
 }
 
 export function mpsToKph(v: number): number {

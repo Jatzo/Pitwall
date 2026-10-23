@@ -3,12 +3,32 @@ import { RaceSim } from '../engine/race.ts';
 import type { RaceConfig } from '../engine/race.ts';
 import type { RaceCommand } from '../engine/types.ts';
 import { CarPanel } from './CarPanel.tsx';
+import { DecisionPrompt } from './DecisionPrompt.tsx';
 import { EventFeed } from './EventFeed.tsx';
+import { nextMoment, watchMoments } from './moments.ts';
+import type { Moment } from './moments.ts';
 import { TimingTower } from './TimingTower.tsx';
 import { TrackMap } from './TrackMap.tsx';
 
 const STEP = 0.1; // simulation timestep in seconds
 const SPEEDS = [1, 2, 4, 8, 16, 32];
+const PAUSE_KEY = 'pitwall.pauseForMoments';
+
+function loadPausePreference(): boolean {
+  try {
+    return window.localStorage.getItem(PAUSE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function savePausePreference(on: boolean): void {
+  try {
+    window.localStorage.setItem(PAUSE_KEY, String(on));
+  } catch {
+    // Storage unavailable: the preference lasts for this race only.
+  }
+}
 
 interface Props {
   config: RaceConfig;
@@ -23,13 +43,20 @@ export function RaceScreen({ config, onFinish }: Props) {
   const [speed, setSpeed] = useState(4);
   const [labels, setLabels] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => sim.cars.find((c) => c.isPlayer)?.id ?? null);
+  const [moment, setMoment] = useState<Moment | null>(null);
+  const [pauseForMoments, setPauseForMoments] = useState(loadPausePreference);
 
   const playingRef = useRef(playing);
   const speedRef = useRef(speed);
+  const pauseRef = useRef(pauseForMoments);
+  const momentRef = useRef(moment);
+  const watchRef = useRef(watchMoments(sim));
   const alphaRef = useRef(0);
   const accRef = useRef(0);
-  playingRef.current = playing;
+  playingRef.current = playing && moment === null;
   speedRef.current = speed;
+  pauseRef.current = pauseForMoments;
+  momentRef.current = moment;
 
   // Main loop: advance the sim in fixed steps, render every animation frame.
   useEffect(() => {
@@ -46,6 +73,14 @@ export function RaceScreen({ config, onFinish }: Props) {
           sim.step(STEP);
           accRef.current -= STEP;
           n++;
+          // Stop on the exact step a key moment happens, rather than at the end of this frame's batch.
+          const found = nextMoment(sim, watchRef.current);
+          if (found && pauseRef.current) {
+            playingRef.current = false;
+            accRef.current = 0;
+            setMoment(found);
+            break;
+          }
         }
         if (n >= 600) accRef.current = 0;
       }
@@ -74,24 +109,43 @@ export function RaceScreen({ config, onFinish }: Props) {
     setPlaying(true);
   };
 
+  const resume = () => {
+    setMoment(null);
+    setPlaying(true);
+  };
+
+  const togglePause = (on: boolean) => {
+    setPauseForMoments(on);
+    savePausePreference(on);
+  };
+
   const finishNow = () => {
+    setMoment(null);
     // Fast-forward to the flag without rendering every step.
     let guard = 0;
     while (sim.phase === 'racing' && guard < 400_000) {
       sim.step(STEP);
       guard++;
     }
+    watchRef.current = watchMoments(sim);
     setTick((t) => t + 1);
   };
 
   // Keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest('input, select, textarea')) return;
       if (e.code === 'Space') {
+        // Space on a focused button or row activates that control instead.
+        if (el?.closest('button, [role="button"]')) return;
         e.preventDefault();
-        setPlaying((p) => !p);
+        if (momentRef.current) {
+          setMoment(null);
+          setPlaying(true);
+        } else {
+          setPlaying((p) => !p);
+        }
       } else if (e.key === '+' || e.key === '=') setSpeed((s) => SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(s) + 1)] ?? s);
       else if (e.key === '-') setSpeed((s) => SPEEDS[Math.max(0, SPEEDS.indexOf(s) - 1)] ?? s);
     };
@@ -120,8 +174,8 @@ export function RaceScreen({ config, onFinish }: Props) {
           <button className="btn primary" onClick={lightsOut}>Lights out</button>
         ) : (
           <>
-            <button className="btn" onClick={() => setPlaying((p) => !p)} disabled={done}>
-              {playing ? 'Pause' : 'Resume'}
+            <button className="btn" onClick={() => (moment || !playing ? resume() : setPlaying(false))} disabled={done}>
+              {playing && !moment ? 'Pause' : 'Resume'}
             </button>
             <span className="btn-group" role="group" aria-label="Simulation speed">
               {SPEEDS.map((s) => (
@@ -133,6 +187,10 @@ export function RaceScreen({ config, onFinish }: Props) {
             <button className="btn" onClick={finishNow} disabled={done}>Skip to finish</button>
           </>
         )}
+        <label className="row" style={{ gap: 6 }}>
+          <input type="checkbox" checked={pauseForMoments} onChange={(e) => togglePause(e.target.checked)} />
+          <span className="muted">Pause for key moments</span>
+        </label>
         <label className="row" style={{ gap: 6 }}>
           <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} />
           <span className="muted">All labels</span>
@@ -153,6 +211,7 @@ export function RaceScreen({ config, onFinish }: Props) {
       <div className="center">
         <div className="panel trackbox">
           <TrackMap sim={sim} selectedId={selectedId} onSelect={setSelectedId} alpha={alphaRef.current} showAllLabels={labels} frame={frame} />
+          {moment && <DecisionPrompt sim={sim} moment={moment} dispatch={dispatch} onResume={resume} />}
         </div>
         <div className="panel" style={{ maxHeight: 190, overflow: 'auto' }}>
           <h3>Race control</h3>

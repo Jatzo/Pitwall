@@ -42,6 +42,24 @@ export function fuelLapsSpare(sim: RaceSim, car: CarState): number {
   return car.fuel / perLap - remaining;
 }
 
+/**
+ * The place a car would hold after losing `lossS` seconds now, for example to
+ * a pit stop: one place lower for each car behind it on the same lap that is
+ * closer than the time lost. Cars already a lap down stay behind whatever
+ * happens on track, so they are ignored.
+ */
+export function rejoinEstimate(sim: RaceSim, car: CarState, lossS: number): number {
+  const order = sim.standings();
+  const position = order.indexOf(car) + 1;
+  let dropped = 0;
+  for (const other of order.slice(position)) {
+    if (other.status === 'out' || car.dist - other.dist >= sim.track.length) continue;
+    const gap = sim.timeBetween(other, car);
+    if (gap !== null && gap < lossS) dropped++;
+  }
+  return position + dropped;
+}
+
 export interface SessionBests {
   sectors: [number, number, number];
   lap: number | null;

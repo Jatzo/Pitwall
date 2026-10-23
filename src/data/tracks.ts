@@ -1,3 +1,4 @@
+import { referenceRaceLaps } from '../engine/race.ts';
 import type { TrackDef } from '../engine/track.ts';
 
 /**
@@ -82,5 +83,5 @@ export function trackById(id: string): TrackDef {
 
 /** Race distance: about 305 km, as in real grands prix. */
 export function fullRaceLaps(track: TrackDef): number {
-  return Math.ceil(305000 / track.lengthM);
+  return referenceRaceLaps(track);
 }

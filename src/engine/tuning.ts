@@ -1,17 +1,15 @@
 /**
  * Every balance knob for the race simulation lives here, so tuning the game is
- * a one-file change. Values were calibrated with `scripts/sim.ts` against
- * real-world ballparks: about 1.5 stops per car, 40-60 on-track overtakes,
- * roughly 0.7 safety cars and 1-2 retirements per race, and a pit-lane time
- * loss of 22-23 seconds.
+ * a one-file change. Values are checked with `npm run calibrate` over 300
+ * full-distance races; the measured results are listed in docs/DESIGN.md.
  */
 export const TUNING = {
   /** Lap-time cost per missing point of car rating (out of 100). */
-  carSecPerPoint: 0.085,
+  carSecPerPoint: 0.07,
   /** Lap-time cost per missing point of driver pace rating. */
   driverSecPerPoint: 0.03,
   /** Per-race random "form" of each car, standard deviation in seconds. */
-  formSigma: 0.2,
+  formSigma: 0.3,
   fuelSecPerKg: 0.03,
   /** Fuel burn per lap at a 5.3 km track. Scaled by lap length. */
   fuelPerLapRef: 1.55,
@@ -43,10 +41,14 @@ export const TUNING = {
   pitDecel: 10,
   maxAccel: 9,
   maxBrake: 40,
-  /** Expected race incidents for the whole field (before safety-car odds). */
+  /** Length of a full-distance race. Hazard rates are set per race of this length. */
+  referenceRaceKm: 305,
+  /** Expected race incidents for the whole field over a full-distance race (before safety-car odds). */
   incidentsPerRace: 0.35,
-  /** Failure probability per race for a car rated 0 reliability. */
+  /** Failure probability per full-distance race for a car rated 0 reliability. */
   failureAtZeroReliability: 0.35,
+  /** An AI car with nobody close ahead saves its tyres once the car behind is this far back (seconds). */
+  cruiseGap: 5,
   /** Planner's estimate of time lost in the pits (seconds). */
   pitLossPlan: 23,
   /** How much AI teams' strategy choices vary (seconds of cost noise). */

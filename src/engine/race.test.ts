@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { defaultTeams } from '../data/teams.ts';
 import { TRACKS } from '../data/tracks.ts';
 import { runQualifying } from './qualifying.ts';
-import { RaceSim, TUNING, carId } from './race.ts';
+import { RaceSim, TUNING, aiPaceMode, carId, incidentRatePerSecond, referenceRaceLaps } from './race.ts';
 import type { RaceConfig } from './race.ts';
 import { POINTS_TABLE, scoreRace } from './scoring.ts';
 
@@ -221,6 +221,36 @@ describe('race simulation', () => {
     for (let i = 1; i < finite.length; i++) assert.ok(finite[i] >= finite[i - 1] - 0.5);
   });
 
+  it('keeps the mechanical failure risk per second the same in short and long races', () => {
+    const short = makeSim({ laps: 20 });
+    const long = makeSim({ laps: referenceRaceLaps(TRACKS[0]) });
+    for (const car of short.cars) {
+      assert.equal(car.failureRate, long.carById(car.id)!.failureRate);
+    }
+  });
+
+  it('scales race incidents with the square root of race distance', () => {
+    const full = referenceRaceLaps(TRACKS[0]);
+    const lap = TRACKS[0].refLapS!;
+    const expected = (laps: number) => incidentRatePerSecond(laps, full, lap) * laps * lap;
+    assert.ok(Math.abs(expected(full) - TUNING.incidentsPerRace) < 1e-9);
+    assert.ok(Math.abs(expected(full / 4) - TUNING.incidentsPerRace / 2) < 1e-9);
+  });
+
+  it('reports finished cars by the difference in finishing time', () => {
+    const sim = run(makeSim({ seed: 5 }));
+    const order = sim.standings().filter((c) => c.finishTime !== null);
+    for (let i = 1; i < order.length; i++) {
+      if (order[i].lap !== order[i - 1].lap) continue;
+      const expected = order[i].finishTime! + order[i].penaltySeconds - (order[i - 1].finishTime! + order[i - 1].penaltySeconds);
+      assert.equal(sim.gapToAhead(order[i]), expected);
+    }
+    const last = order[order.length - 1];
+    if (last.lap === order[0].lap) {
+      assert.equal(sim.gapToLeader(last).seconds, last.finishTime! + last.penaltySeconds - order[0].finishTime! - order[0].penaltySeconds);
+    }
+  });
+
   it('lets a safety car period bunch the field and then restart', () => {
     // Find a seed that produces a safety car, then check the field closes up.
     let found = false;
@@ -268,5 +298,36 @@ describe('scoring', () => {
       assert.equal(r.points, POINTS_TABLE[i] + bonus);
     });
     for (const r of rows.filter((x) => !x.finished)) assert.equal(r.points, 0);
+  });
+});
+
+describe('AI pace choice', () => {
+  const calm = { safetyCar: false, lapsRemaining: 30, wear: 0.3, lapsToNextStop: 10, gapAhead: 5, gapBehind: 2 };
+
+  it('runs standard pace with nothing going on', () => {
+    assert.equal(aiPaceMode(calm), 'standard');
+  });
+
+  it('pushes when close behind another car on healthy tyres', () => {
+    assert.equal(aiPaceMode({ ...calm, gapAhead: 0.8 }), 'push');
+  });
+
+  it('saves tyres when nobody is close ahead and the car behind is far back', () => {
+    assert.equal(aiPaceMode({ ...calm, gapAhead: null, gapBehind: TUNING.cruiseGap + 1 }), 'conserve');
+    assert.equal(aiPaceMode({ ...calm, gapAhead: 5, gapBehind: TUNING.cruiseGap + 1 }), 'conserve');
+    assert.equal(aiPaceMode({ ...calm, gapAhead: null, gapBehind: TUNING.cruiseGap - 1 }), 'standard');
+  });
+
+  it('pushes on the last laps when there is a place to win or defend', () => {
+    assert.equal(aiPaceMode({ ...calm, lapsRemaining: 2, gapAhead: null, gapBehind: 3 }), 'push');
+    assert.equal(aiPaceMode({ ...calm, lapsRemaining: 2, gapAhead: 4, gapBehind: 30 }), 'push');
+  });
+
+  it('cruises to the flag with a safe lead and nobody to catch', () => {
+    assert.equal(aiPaceMode({ ...calm, lapsRemaining: 2, gapAhead: null, gapBehind: TUNING.cruiseGap + 1 }), 'conserve');
+  });
+
+  it('conserves under the safety car', () => {
+    assert.equal(aiPaceMode({ ...calm, safetyCar: true, gapAhead: 0.5 }), 'conserve');
   });
 });

@@ -1,6 +1,7 @@
 import { formatGap, formatLap } from '../engine/format.ts';
-import { burnPerLap, fuelLapsSpare, tyreLapsLeft, wearRatesFor } from '../engine/insights.ts';
+import { burnPerLap, fuelLapsSpare, rejoinEstimate, tyreLapsLeft, wearRatesFor } from '../engine/insights.ts';
 import type { CarState, RaceSim } from '../engine/race.ts';
+import { TUNING } from '../engine/tuning.ts';
 import { ALL_COMPOUNDS, CLIFF_START, COMPOUNDS } from '../engine/tyres.ts';
 import type { EngineMode, PaceMode, RaceCommand, StrategyPlan } from '../engine/types.ts';
 import { TeamLogo } from './TeamLogo.tsx';
@@ -103,23 +104,25 @@ export function CarPanel({ sim, car, dispatch }: Props) {
           <span className="num">{Math.round(wearPct * 100)}%</span>
         </div>
         <Meter value={wearPct} color={wearColor} mark={CLIFF_START} />
-        <div className="muted" style={{ fontSize: 12, margin: '6px 0 12px' }}>
-          About <b className="num" style={{ color: 'var(--text)' }}>{Math.floor(lapsLeft)}</b> laps left before the tyres are finished
-          {wearPct > CLIFF_START && <span className="bad"> (past the performance cliff)</span>}
-        </div>
+        {!out && (
+          <div className="muted" style={{ fontSize: 12, margin: '6px 0 12px' }}>
+            About <b className="num" style={{ color: 'var(--text)' }}>{Math.floor(lapsLeft)}</b> laps left before the tyres are finished
+            {wearPct > CLIFF_START && <span className="bad"> (past the performance cliff)</span>}
+          </div>
+        )}
         <div className="row" style={{ marginBottom: 6 }}>
           <span>Fuel</span>
           <span style={{ flex: 1 }} />
           <span className="num">{car.fuel.toFixed(1)} kg</span>
         </div>
         <Meter value={fuelFrac} color={spare < 0 ? 'var(--bad)' : 'var(--text)'} />
-        <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+        {!out && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
           {spare >= 0 ? (
             <>Enough for the finish with <b className="num" style={{ color: 'var(--text)' }}>{spare.toFixed(1)}</b> laps spare</>
           ) : (
             <span className="bad">Short of fuel by {(-spare).toFixed(1)} laps. Lean the engine or conserve.</span>
           )}
-        </div>
+        </div>}
       </div>
 
       {mine && !out && (
@@ -171,6 +174,13 @@ export function CarPanel({ sim, car, dispatch }: Props) {
               ))}
               {car.pitRequest && <span className="warn">Box requested: {COMPOUNDS[car.pitRequest].name}</span>}
             </div>
+            {car.status === 'running' && (
+              <div className="muted" style={{ fontSize: 12, margin: '-4px 0 10px' }}>
+                {sim.sc.active
+                  ? 'Safety car: the field is bunched, so a stop now costs few places.'
+                  : `A stop now rejoins about P${rejoinEstimate(sim, car, TUNING.pitLossPlan)}.`}
+              </div>
+            )}
             <PlanEditor
               plan={planForEditor}
               totalLaps={sim.totalLaps}

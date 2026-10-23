@@ -124,12 +124,13 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .tower { font-size: 12.5px; }
 .tower .trow > span { min-width: 0; white-space: nowrap; overflow: hidden; }
 .tower .trow {
-  display: grid; grid-template-columns: 20px 4px 34px 56px 62px 46px 30px 20px; gap: 5px; align-items: center;
+  display: grid; grid-template-columns: 20px 4px 36px 62px 64px 46px 30px 30px; gap: 5px; align-items: center;
   padding: 3px 6px; border-radius: 4px; cursor: pointer; border: 1px solid transparent;
 }
 .tower .thead { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; cursor: default; }
 .tower .trow:hover:not(.thead) { background: var(--panel-2); }
 .tower .trow.sel { border-color: #3a4666; background: #1a2030; }
+.tower .trow:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .tower .trow.mine .code { font-weight: 800; }
 .tower .trow.out { opacity: 0.45; }
 .tower .pos { text-align: right; color: var(--muted); }
@@ -171,3 +172,13 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .chequer { display: inline-block; width: 12px; height: 12px; background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0); background-size: 6px 6px; }
 .modal-back { position: fixed; inset: 0; background: #000a; display: grid; place-items: center; z-index: 10; padding: 16px; }
 .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; max-width: 880px; width: 100%; max-height: 90vh; overflow: auto; }
+
+/* ----- decision prompt ----- */
+.decision {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 24px));
+  background: var(--panel); border: 1px solid #5b4310; border-radius: var(--radius); padding: 14px;
+  box-shadow: 0 10px 30px #000a; display: flex; flex-direction: column; gap: 10px; z-index: 5;
+}
+.decision h2 { font-size: 17px; margin: 0; color: #ffd75e; }
+.decision p { margin: 0; font-size: 13px; }
+.decision-car { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
