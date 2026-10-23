@@ -3,7 +3,7 @@
  * the logic is easy to unit test.
  */
 
-import { TRACKS } from '../data/tracks.ts';
+import { SEASON_CALENDAR } from '../data/tracks.ts';
 import type { ScoredRow } from '../engine/scoring.ts';
 import type { TeamDef } from '../engine/types.ts';
 
@@ -33,7 +33,7 @@ export interface Career {
   results: RaceRecord[];
 }
 
-export const CALENDAR: readonly string[] = TRACKS.map((t) => t.id);
+export const CALENDAR: readonly string[] = SEASON_CALENDAR;
 
 export function newCareer(playerTeamId: string, seed = Math.floor(Math.random() * 2 ** 31)): Career {
   return { version: 1, seed, playerTeamId, calendar: [...CALENDAR], results: [] };

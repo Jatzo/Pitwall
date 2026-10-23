@@ -55,6 +55,34 @@ describe('Track', () => {
         assert.ok(track.pitEntryS > track.length / 2);
         assert.ok(track.pitExitS < track.length / 2);
       });
+
+      it('starts on a near-straight, so the grid and pit lane are not in a corner', () => {
+        let turning = 0;
+        for (let s = -track.pitEntryM; s < track.pitExitM; s += 5) {
+          let d = track.pointAt(s + 5).heading - track.pointAt(s).heading;
+          while (d > Math.PI) d -= 2 * Math.PI;
+          while (d < -Math.PI) d += 2 * Math.PI;
+          turning += Math.abs(d);
+        }
+        assert.ok((turning * 180) / Math.PI < 45, `turns ${(turning * 180) / Math.PI} degrees`);
+      });
+
+      it('keeps every part of the lap well clear of the others, so the map reads clearly', () => {
+        const apart = Math.round(300 / track.step);
+        let closest = Infinity;
+        for (let i = 0; i < track.n; i += 2) {
+          for (let j = i + apart; j < Math.min(track.n, track.n - apart + i); j += 2) {
+            closest = Math.min(closest, Math.hypot(track.x[i] - track.x[j], track.y[i] - track.y[j]));
+          }
+        }
+        assert.ok(closest > 100, `closest approach ${closest} m`);
+      });
+
+      it('has a reference lap the layout can deliver, not one far faster', () => {
+        const physical = new Track({ ...def, refLapS: undefined }).refLap;
+        const scale = physical / track.refLap;
+        assert.ok(scale > 0.85 && scale <= 1.0, `speeds scaled by ${scale}`);
+      });
     });
   }
 });

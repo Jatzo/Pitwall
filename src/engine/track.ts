@@ -14,6 +14,8 @@ export interface TrackDef {
   id: string;
   name: string;
   location: string;
+  /** One line on what makes the circuit different, for the calendar. */
+  summary?: string;
   /** Closed loop of control points (arbitrary units; scaled to lengthM). */
   controlPoints: readonly Vec2[];
   lengthM: number;
