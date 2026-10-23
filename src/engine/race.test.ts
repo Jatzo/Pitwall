@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { defaultTeams } from '../data/teams.ts';
 import { TRACKS } from '../data/tracks.ts';
 import { runQualifying } from './qualifying.ts';
-import { RaceSim, TUNING, carId, incidentRatePerSecond, referenceRaceLaps } from './race.ts';
+import { RaceSim, TUNING, aiPaceMode, carId, incidentRatePerSecond, referenceRaceLaps } from './race.ts';
 import type { RaceConfig } from './race.ts';
 import { POINTS_TABLE, scoreRace } from './scoring.ts';
 
@@ -298,5 +298,36 @@ describe('scoring', () => {
       assert.equal(r.points, POINTS_TABLE[i] + bonus);
     });
     for (const r of rows.filter((x) => !x.finished)) assert.equal(r.points, 0);
+  });
+});
+
+describe('AI pace choice', () => {
+  const calm = { safetyCar: false, lapsRemaining: 30, wear: 0.3, lapsToNextStop: 10, gapAhead: 5, gapBehind: 2 };
+
+  it('runs standard pace with nothing going on', () => {
+    assert.equal(aiPaceMode(calm), 'standard');
+  });
+
+  it('pushes when close behind another car on healthy tyres', () => {
+    assert.equal(aiPaceMode({ ...calm, gapAhead: 0.8 }), 'push');
+  });
+
+  it('saves tyres when nobody is close ahead and the car behind is far back', () => {
+    assert.equal(aiPaceMode({ ...calm, gapAhead: null, gapBehind: TUNING.cruiseGap + 1 }), 'conserve');
+    assert.equal(aiPaceMode({ ...calm, gapAhead: 5, gapBehind: TUNING.cruiseGap + 1 }), 'conserve');
+    assert.equal(aiPaceMode({ ...calm, gapAhead: null, gapBehind: TUNING.cruiseGap - 1 }), 'standard');
+  });
+
+  it('pushes on the last laps when there is a place to win or defend', () => {
+    assert.equal(aiPaceMode({ ...calm, lapsRemaining: 2, gapAhead: null, gapBehind: 3 }), 'push');
+    assert.equal(aiPaceMode({ ...calm, lapsRemaining: 2, gapAhead: 4, gapBehind: 30 }), 'push');
+  });
+
+  it('cruises to the flag with a safe lead and nobody to catch', () => {
+    assert.equal(aiPaceMode({ ...calm, lapsRemaining: 2, gapAhead: null, gapBehind: TUNING.cruiseGap + 1 }), 'conserve');
+  });
+
+  it('conserves under the safety car', () => {
+    assert.equal(aiPaceMode({ ...calm, safetyCar: true, gapAhead: 0.5 }), 'conserve');
   });
 });

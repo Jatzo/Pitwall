@@ -203,6 +203,37 @@ export function incidentRatePerSecond(laps: number, fullLaps: number, refLapS: n
   return incidents / (laps * refLapS);
 }
 
+export interface PaceSituation {
+  safetyCar: boolean;
+  lapsRemaining: number;
+  /** Tyre wear, 0 (new) to 1 (finished). */
+  wear: number;
+  /** Laps until the next planned stop, or null if none is planned. */
+  lapsToNextStop: number | null;
+  /** Seconds to the car ahead and behind in the classification, or null if there is none. */
+  gapAhead: number | null;
+  gapBehind: number | null;
+}
+
+/**
+ * The pace mode an AI driver picks at the start of a lap. A car with nobody to
+ * race (no one close ahead, and a comfortable gap behind) saves its tyres, as
+ * real leaders do, which keeps winning margins plausible.
+ */
+export function aiPaceMode(s: PaceSituation): PaceMode {
+  if (s.safetyCar) return 'conserve';
+  const threatBehind = s.gapBehind !== null && s.gapBehind <= TUNING.cruiseGap;
+  if (s.lapsRemaining <= 3 && s.wear < 0.9) {
+    // Push to the flag only with a place to win or defend.
+    const chasing = s.gapAhead !== null && s.gapAhead <= TUNING.cruiseGap;
+    return chasing || threatBehind ? 'push' : 'conserve';
+  }
+  if (s.wear > 0.8 && !(s.lapsToNextStop !== null && s.lapsToNextStop <= 1)) return 'conserve';
+  if (s.gapAhead !== null && s.gapAhead < 1.2 && s.wear < 0.65) return 'push';
+  const nothingAhead = s.gapAhead === null || s.gapAhead > 2.5;
+  return nothingAhead && !threatBehind ? 'conserve' : 'standard';
+}
+
 /** Did a point moving from position a to b (both in [0,L)) cross `line`? */
 function crossed(a: number, b: number, line: number): boolean {
   if (b >= a) return a < line && line <= b;
@@ -976,13 +1007,16 @@ export class RaceSim {
     const next = car.plan.stops[0];
 
     // Pace and engine modes.
-    const gap = this.gapToAhead(car);
-    let pace: PaceMode = 'standard';
-    if (this.sc.active) pace = 'conserve';
-    else if (remaining <= 3 && wear < 0.9) pace = 'push';
-    else if (wear > 0.8 && !(next && next.lap - car.lap <= 1)) pace = 'conserve';
-    else if (gap !== null && gap < 1.2 && wear < 0.65) pace = 'push';
-    car.paceMode = pace;
+    const order = this.standings();
+    const behind = order[order.indexOf(car) + 1];
+    car.paceMode = aiPaceMode({
+      safetyCar: this.sc.active,
+      lapsRemaining: remaining,
+      wear,
+      lapsToNextStop: next ? next.lap - car.lap : null,
+      gapAhead: this.gapToAhead(car),
+      gapBehind: behind && behind.status !== 'out' ? this.gapToAhead(behind) : null,
+    });
     const spare = car.fuel - remaining * this.burnPerLap;
     car.engineMode = spare < 0.3 ? 'lean' : spare > 2.5 && remaining <= 5 ? 'rich' : 'standard';
 

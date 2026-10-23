@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --test \"src/**/*.test.ts\"",
-    "sim": "node scripts/sim.ts"
+    "sim": "node scripts/sim.ts",
+    "calibrate": "node scripts/calibrate.ts"
   },
   "dependencies": {
     "react": "^19.2.0",
