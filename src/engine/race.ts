@@ -1,0 +1,1078 @@
+/**
+ * Race simulation.
+ *
+ * A fixed-timestep simulation. Each car has a position along the lap (total
+ * metres from the start line), a speed, tyres, fuel and a strategy. Every tick
+ * a car works out how fast it *wants* to go (track speed profile scaled by its
+ * current lap-time potential), is limited by the car in front, and moves.
+ *
+ * Everything is deterministic given the seed and the command log, and there
+ * are no UI dependencies.
+ */
+
+import { formatLap } from './format.ts';
+import { Rng, mixSeed } from './rng.ts';
+import { jitterStops, planStrategy } from './strategy.ts';
+import type { PlanContext, WearRates } from './strategy.ts';
+import { Track } from './track.ts';
+import type { TrackDef } from './track.ts';
+import { TUNING } from './tuning.ts';
+import { COMPOUNDS, tyrePenalty } from './tyres.ts';
+import type {
+  Compound,
+  DriverDef,
+  EngineMode,
+  PaceMode,
+  RaceCommand,
+  StrategyPlan,
+  TeamDef,
+} from './types.ts';
+
+export { TUNING };
+
+export type CarStatus = 'running' | 'pitLane' | 'out' | 'finished';
+export type RacePhase = 'grid' | 'racing' | 'finished';
+
+export interface LapRecord {
+  lap: number;
+  time: number;
+  sectors: [number, number, number];
+  compound: Compound;
+  tyreAge: number;
+  pit: boolean;
+  /** Counts for fastest-lap purposes (no pit stop, no safety car). */
+  clean: boolean;
+}
+
+export interface StopRecord {
+  lap: number;
+  compound: Compound;
+  /** Seconds stationary. */
+  duration: number;
+}
+
+export interface PitState {
+  phase: 'in' | 'stopped' | 'out';
+  boxDist: number;
+  exitDist: number;
+  stopEnd: number;
+  compound: Compound;
+}
+
+export interface CarState {
+  readonly id: string;
+  readonly team: TeamDef;
+  readonly driver: DriverDef;
+  readonly grid: number;
+  readonly isPlayer: boolean;
+
+  dist: number;
+  prevDist: number;
+  speed: number;
+  lat: number;
+  prevLat: number;
+  /** Laps completed. */
+  lap: number;
+  status: CarStatus;
+
+  paceMode: PaceMode;
+  engineMode: EngineMode;
+  /** When true, the AI race engineer manages this car's modes and unscheduled stops. */
+  auto: boolean;
+  tyre: { compound: Compound; wear: number; ageLaps: number };
+  usedCompounds: Compound[];
+  fuel: number;
+
+  plan: StrategyPlan;
+  pitRequest: Compound | null;
+  pit: PitState | null;
+  stops: StopRecord[];
+
+  laps: LapRecord[];
+  bestLap: number | null;
+  lastLap: number | null;
+  lapStartTime: number;
+  sectorMarks: [number | null, number | null];
+  currentLapPit: boolean;
+  currentLapSC: boolean;
+
+  /** Lap time this car could do right now (s). */
+  paceNow: number;
+  lapNoise: number;
+  errorPenalty: number;
+  damage: number;
+  dirty: number;
+  drsOn: boolean;
+  drsElig: boolean[];
+  passing: { targetId: string; until: number; side: 1 | -1 } | null;
+  passCooldown: number;
+
+  reaction: number;
+  finishTime: number | null;
+  penaltySeconds: number;
+  outReason: string | null;
+  outLap: number | null;
+
+  // Per-tick neighbour info (set before cars update).
+  ahead: CarState | null;
+  aheadGap: number;
+
+  // Constants derived at creation.
+  readonly carDelta: number;
+  readonly driverDelta: number;
+  readonly wearFactor: number;
+  readonly failureRate: number;
+  readonly rng: Rng;
+  readonly cpTimes: Float64Array;
+}
+
+export type EventKind =
+  | 'lights'
+  | 'pit'
+  | 'overtake'
+  | 'fastest'
+  | 'retire'
+  | 'safetycar'
+  | 'green'
+  | 'finish'
+  | 'incident'
+  | 'penalty'
+  | 'info';
+
+export interface RaceEvent {
+  id: number;
+  t: number;
+  lap: number;
+  kind: EventKind;
+  carId?: string;
+  message: string;
+}
+
+export interface RaceConfig {
+  track: TrackDef;
+  teams: TeamDef[];
+  /** Car ids in grid order, pole position first. Car id is `${team.id}:${0|1}`. */
+  grid: string[];
+  laps: number;
+  seed: number;
+  playerTeamId: string | null;
+  /** Pre-set strategies, keyed by car id (used for player cars). */
+  strategies?: Record<string, StrategyPlan>;
+}
+
+export interface ResultRow {
+  position: number;
+  carId: string;
+  grid: number;
+  laps: number;
+  finished: boolean;
+  /** Total race time including penalties, if the car finished. */
+  timeS: number | null;
+  /** Gap to the winner in seconds (same lap) or null. */
+  gapS: number | null;
+  lapsDown: number;
+  bestLap: number | null;
+  pitStops: number;
+  penaltyS: number;
+  outReason: string | null;
+}
+
+const CP_LEN = 10; // checkpoint spacing for gap timing, metres
+
+export function carId(team: TeamDef, index: 0 | 1): string {
+  return `${team.id}:${index}`;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/** Did a point moving from position a to b (both in [0,L)) cross `line`? */
+function crossed(a: number, b: number, line: number): boolean {
+  if (b >= a) return a < line && line <= b;
+  return line > a || line <= b;
+}
+
+export class RaceSim {
+  readonly cfg: RaceConfig;
+  readonly track: Track;
+  readonly totalLaps: number;
+  readonly cars: CarState[];
+  readonly events: RaceEvent[] = [];
+  readonly commandLog: { t: number; cmd: RaceCommand }[] = [];
+
+  phase: RacePhase = 'grid';
+  time = 0;
+  raceOver = false;
+  sc = { active: false, lapsLeft: 0 };
+  fastestLap: { carId: string; time: number; lap: number } | null = null;
+  /** Number of safety car periods so far. */
+  scCount = 0;
+  overtakeCount = 0;
+
+  private readonly byId = new Map<string, CarState>();
+  private readonly eventRng: Rng;
+  private readonly boxFreeAt = new Map<string, number>();
+  private standingsCache: CarState[] | null = null;
+  private eventSeq = 0;
+  private readonly burnPerLap: number;
+
+  constructor(cfg: RaceConfig) {
+    this.cfg = cfg;
+    this.track = new Track(cfg.track);
+    this.totalLaps = cfg.laps;
+    this.eventRng = new Rng(mixSeed(cfg.seed, 'race-control'));
+    this.burnPerLap = (TUNING.fuelPerLapRef * this.track.length) / 5300;
+
+    const defs = new Map<string, { team: TeamDef; driver: DriverDef }>();
+    for (const team of cfg.teams) {
+      defs.set(carId(team, 0), { team, driver: team.drivers[0] });
+      defs.set(carId(team, 1), { team, driver: team.drivers[1] });
+    }
+    if (cfg.grid.length !== defs.size) {
+      throw new Error(`Grid has ${cfg.grid.length} cars but ${defs.size} are entered`);
+    }
+    this.cars = cfg.grid.map((id, slot) => {
+      const def = defs.get(id);
+      if (!def) throw new Error(`Unknown car on grid: ${id}`);
+      return this.makeCar(id, def.team, def.driver, slot);
+    });
+    for (const car of this.cars) this.byId.set(car.id, car);
+  }
+
+  // ---------------------------------------------------------------- setup
+
+  private makeCar(id: string, team: TeamDef, driver: DriverDef, slot: number): CarState {
+    const { track, cfg } = this;
+    const rng = new Rng(mixSeed(cfg.seed, id));
+    const w = track.def.weights;
+    const perf = team.car.power * w.power + team.car.aero * w.aero + team.car.chassis * w.chassis;
+    const form = rng.normal(0, TUNING.formSigma);
+    const wearFactor =
+      (1.1 - (driver.ratings.tyreMgmt / 100) * 0.25) * (1.1 - (team.car.chassis / 100) * 0.2);
+    const raceSeconds = this.totalLaps * track.refLap;
+    const failureRate =
+      (((100 - team.car.reliability) / 100) * TUNING.failureAtZeroReliability) / raceSeconds;
+    const isPlayer = team.id === cfg.playerTeamId;
+
+    const car: CarState = {
+      id,
+      team,
+      driver,
+      grid: slot + 1,
+      isPlayer,
+      dist: -(10 + 8 * slot),
+      prevDist: -(10 + 8 * slot),
+      speed: 0,
+      lat: slot % 2 === 0 ? -0.45 : 0.45,
+      prevLat: slot % 2 === 0 ? -0.45 : 0.45,
+      lap: 0,
+      status: 'running',
+      paceMode: 'standard',
+      engineMode: 'standard',
+      auto: false,
+      tyre: { compound: 'M', wear: 0, ageLaps: 0 },
+      usedCompounds: [],
+      fuel: this.totalLaps * this.burnPerLap + TUNING.fuelMarginKg,
+      plan: { startCompound: 'M', stops: [] },
+      pitRequest: null,
+      pit: null,
+      stops: [],
+      laps: [],
+      bestLap: null,
+      lastLap: null,
+      lapStartTime: 0,
+      sectorMarks: [null, null],
+      currentLapPit: false,
+      currentLapSC: false,
+      paceNow: track.refLap,
+      lapNoise: 0,
+      errorPenalty: 0,
+      damage: 0,
+      dirty: 0,
+      drsOn: false,
+      drsElig: track.drsZones.map(() => false),
+      passing: null,
+      passCooldown: 0,
+      reaction: 0.3,
+      finishTime: null,
+      penaltySeconds: 0,
+      outReason: null,
+      outLap: null,
+      ahead: null,
+      aheadGap: Infinity,
+      carDelta: (100 - perf) * TUNING.carSecPerPoint + form,
+      driverDelta: (100 - driver.ratings.pace) * TUNING.driverSecPerPoint,
+      wearFactor,
+      failureRate,
+      rng,
+      cpTimes: new Float64Array(Math.ceil(((this.totalLaps + 3) * track.length) / CP_LEN)).fill(NaN),
+    };
+
+    // Strategy: pre-set (player) or planned (AI, with some variety).
+    const preset = cfg.strategies?.[id];
+    let plan: StrategyPlan;
+    if (preset) {
+      plan = preset;
+    } else {
+      const ctx = this.planContext(car, null, 0);
+      plan = planStrategy(isPlayer ? ctx : { ...ctx, jitter: { rng, seconds: TUNING.aiStrategyJitter } });
+      if (!isPlayer) plan = jitterStops(plan, rng, 3, 4, this.totalLaps - 3);
+    }
+    car.plan = { startCompound: plan.startCompound, stops: plan.stops.map((s) => ({ ...s })) };
+    car.tyre = { compound: plan.startCompound, wear: 0, ageLaps: 0 };
+    car.usedCompounds = [plan.startCompound];
+    return car;
+  }
+
+  private wearRates(car: CarState): WearRates {
+    const k = this.track.def.tyreSeverity * car.wearFactor;
+    return {
+      S: COMPOUNDS.S.wearPerLap * k,
+      M: COMPOUNDS.M.wearPerLap * k,
+      H: COMPOUNDS.H.wearPerLap * k,
+    };
+  }
+
+  private planContext(car: CarState, current: Compound | null, wear: number): PlanContext {
+    return {
+      lapsRemaining: this.totalLaps - car.lap,
+      lapsCompleted: car.lap,
+      wearRates: this.wearRates(car),
+      pitLoss: TUNING.pitLossPlan,
+      currentCompound: current,
+      currentWear: wear,
+      used: car.usedCompounds,
+    };
+  }
+
+  /** Plan strategy for a driver before the race, for UI suggestions. */
+  static suggestPlan(
+    track: TrackDef,
+    team: TeamDef,
+    driver: DriverDef,
+    laps: number,
+    startCompound: Compound | null,
+  ): StrategyPlan {
+    const k =
+      track.tyreSeverity *
+      (1.1 - (driver.ratings.tyreMgmt / 100) * 0.25) *
+      (1.1 - (team.car.chassis / 100) * 0.2);
+    return planStrategy({
+      lapsRemaining: laps,
+      lapsCompleted: 0,
+      wearRates: {
+        S: COMPOUNDS.S.wearPerLap * k,
+        M: COMPOUNDS.M.wearPerLap * k,
+        H: COMPOUNDS.H.wearPerLap * k,
+      },
+      pitLoss: TUNING.pitLossPlan,
+      currentCompound: startCompound,
+      currentWear: 0,
+      used: startCompound ? [startCompound] : [],
+    });
+  }
+
+  carById(id: string): CarState | undefined {
+    return this.byId.get(id);
+  }
+
+  /** Begin the race (lights out). */
+  start(): void {
+    if (this.phase !== 'grid') return;
+    this.phase = 'racing';
+    this.time = 0;
+    for (const car of this.cars) {
+      const startSkill = car.driver.ratings.start;
+      car.reaction = Math.max(0.15, car.rng.normal(0.3 - (startSkill - 80) * 0.003, 0.05));
+      car.lapNoise = car.rng.normal(0, this.lapSigma(car));
+    }
+    this.addEvent('lights', 'Lights out and away we go!');
+  }
+
+  // ------------------------------------------------------------- commands
+
+  command(cmd: RaceCommand): void {
+    const car = this.byId.get(cmd.carId);
+    if (!car || car.status === 'out' || car.status === 'finished') return;
+    this.commandLog.push({ t: this.time, cmd });
+    switch (cmd.type) {
+      case 'pace':
+        car.paceMode = cmd.mode;
+        break;
+      case 'engine':
+        car.engineMode = cmd.mode;
+        break;
+      case 'pit':
+        if (!this.raceOver) car.pitRequest = cmd.compound;
+        break;
+      case 'plan':
+        car.plan = { startCompound: cmd.plan.startCompound, stops: cmd.plan.stops.map((s) => ({ ...s })) };
+        break;
+      case 'auto':
+        car.auto = cmd.enabled;
+        break;
+    }
+  }
+
+  // ----------------------------------------------------------------- step
+
+  step(dt: number): void {
+    if (this.phase !== 'racing') return;
+    this.time += dt;
+    this.standingsCache = null;
+    this.computeNeighbours();
+    this.updateRaceControl(dt);
+    for (const car of this.cars) this.updateCar(car, dt);
+    const done = this.cars.every((c) => c.status === 'out' || c.status === 'finished');
+    if (done || this.time > 4 * 3600) this.finishRace();
+  }
+
+  private computeNeighbours(): void {
+    const L = this.track.length;
+    const ring = this.cars
+      .filter((c) => c.status === 'running')
+      .map((c) => ({ c, pos: this.track.wrap(c.dist) }))
+      .sort((a, b) => a.pos - b.pos);
+    for (const car of this.cars) {
+      car.ahead = null;
+      car.aheadGap = Infinity;
+    }
+    const m = ring.length;
+    if (m < 2) return;
+    for (let i = 0; i < m; i++) {
+      const me = ring[i];
+      const next = ring[(i + 1) % m];
+      const gap = (next.pos - me.pos + L) % L;
+      if (gap < 150) {
+        me.c.ahead = next.c;
+        me.c.aheadGap = gap;
+      }
+    }
+  }
+
+  // --------------------------------------------------------- race control
+
+  private leaderLap(): number {
+    let lap = 0;
+    for (const c of this.cars) if (c.status !== 'out') lap = Math.max(lap, c.lap);
+    return lap;
+  }
+
+  private leader(): CarState | null {
+    return this.standings().find((c) => c.status !== 'out') ?? null;
+  }
+
+  private updateRaceControl(dt: number): void {
+    if (this.raceOver || this.sc.active) return;
+    if (this.leaderLap() >= this.totalLaps - 2) return;
+    const perSecond = TUNING.incidentsPerRace / (this.totalLaps * this.track.refLap);
+    const startMultiplier = this.time < 30 ? 25 : 1;
+    if (!this.eventRng.chance(perSecond * startMultiplier * dt)) return;
+
+    const candidates = this.cars.filter((c) => c.status === 'running' && this.time > c.reaction);
+    if (candidates.length === 0) return;
+    const victim = this.eventRng.pick(candidates);
+    if (this.eventRng.chance(0.5)) {
+      this.addEvent('incident', `${victim.driver.code} is out after contact!`, victim.id);
+      this.retire(victim, 'Collision', 0.85);
+    } else {
+      victim.damage += this.eventRng.range(0.8, 2.2);
+      this.addEvent('incident', `${victim.driver.code} has damage after a collision`, victim.id);
+      if (this.eventRng.chance(0.4)) this.deploySafetyCar('Debris on track');
+      if (victim.isPlayer) {
+        this.addEvent('info', `${victim.driver.code}: "I've got damage, we should pit."`, victim.id);
+      }
+    }
+  }
+
+  private deploySafetyCar(reason: string): void {
+    if (this.sc.active || this.raceOver || this.leaderLap() >= this.totalLaps - 2) return;
+    this.sc.active = true;
+    this.sc.lapsLeft = this.eventRng.int(3, 5);
+    this.scCount++;
+    for (const car of this.cars) {
+      car.passing = null;
+      car.drsOn = false;
+    }
+    this.addEvent('safetycar', `Safety car deployed: ${reason}`);
+  }
+
+  private endSafetyCar(): void {
+    this.sc.active = false;
+    this.sc.lapsLeft = 0;
+    this.addEvent('green', 'Green flag - racing resumes');
+  }
+
+  /** Where to draw the safety car, if it is out. */
+  safetyCarDist(): number | null {
+    if (!this.sc.active) return null;
+    const lead = this.leader();
+    return lead ? lead.dist + 60 : null;
+  }
+
+  private retire(car: CarState, reason: string, scChance = 0.6): void {
+    const onTrack = car.status === 'running';
+    car.status = 'out';
+    car.speed = 0;
+    car.pit = null;
+    car.pitRequest = null;
+    car.passing = null;
+    car.outReason = reason;
+    car.outLap = car.lap + 1;
+    this.standingsCache = null;
+    this.addEvent('retire', `${car.driver.code} retires: ${reason}`, car.id);
+    if (onTrack && this.eventRng.chance(scChance)) {
+      this.deploySafetyCar(`${car.driver.code} stopped on track`);
+    }
+  }
+
+  // ------------------------------------------------------------- per car
+
+  private lapSigma(car: CarState): number {
+    return 0.08 + (100 - car.driver.ratings.consistency) * 0.01;
+  }
+
+  private paceOf(car: CarState): number {
+    const { track } = this;
+    if (this.sc.active) return track.refLap * TUNING.scFactor;
+    const spec = COMPOUNDS[car.tyre.compound];
+    const mode = TUNING.paceMode[car.paceMode];
+    const engine = TUNING.engineMode[car.engineMode];
+    const warmup = Math.max(0, 1 - car.tyre.ageLaps) * TUNING.warmupPenalty;
+    const rubber = Math.min(0.5, (this.time / 3600) * 0.5);
+    return (
+      track.refLap +
+      car.carDelta +
+      car.driverDelta +
+      spec.paceDelta +
+      tyrePenalty(car.tyre.compound, car.tyre.wear) +
+      warmup +
+      car.fuel * TUNING.fuelSecPerKg +
+      mode.pace +
+      engine.pace +
+      car.lapNoise +
+      car.damage +
+      car.errorPenalty +
+      car.dirty * TUNING.dirtyAirSeconds -
+      rubber
+    );
+  }
+
+  private relDist(a: CarState, b: CarState): number {
+    const L = this.track.length;
+    const diff = a.dist - b.dist;
+    return ((((diff + L / 2) % L) + L) % L) - L / 2;
+  }
+
+  private rollHazards(car: CarState, dt: number): void {
+    const engine = TUNING.engineMode[car.engineMode];
+    const push = car.paceMode === 'push' ? 1.2 : 1;
+    if (car.rng.next() < car.failureRate * engine.hazard * push * dt) {
+      this.retire(car, 'Mechanical failure');
+      return;
+    }
+    if (car.fuel <= 0) {
+      this.retire(car, 'Out of fuel', 0.7);
+      return;
+    }
+    if (car.tyre.wear > 1.02 && car.rng.next() < 0.2 * (car.tyre.wear - 1) * dt) {
+      car.damage += 3;
+      car.tyre.wear = 1.02;
+      if (car.pitRequest === null) car.pitRequest = this.chooseNextCompound(car);
+      this.addEvent('incident', `${car.driver.code} has a puncture!`, car.id);
+      if (this.eventRng.chance(0.3)) this.deploySafetyCar('Debris on track');
+    }
+  }
+
+  private updateCar(car: CarState, dt: number): void {
+    if (car.status === 'out') return;
+    car.prevDist = car.dist;
+    car.prevLat = car.lat;
+    if (this.time < car.reaction) return;
+
+    const { track } = this;
+    const L = track.length;
+    const oldDist = car.dist;
+    const oldPos = track.wrap(oldDist);
+
+    if (car.status === 'running') {
+      this.rollHazards(car, dt);
+      if (car.status !== 'running') return;
+    }
+
+    const pace = this.paceOf(car);
+    car.paceNow = pace;
+    let target = (track.speedAt(oldPos) * track.refLap) / pace;
+    if (this.sc.active) car.currentLapSC = true;
+
+    if (car.status === 'finished') {
+      target *= 0.55;
+    } else if (car.status === 'pitLane') {
+      target = this.pitLaneTarget(car, target);
+    } else {
+      target = this.racingTarget(car, target, oldPos, dt);
+    }
+
+    // Accelerate / brake towards the target speed.
+    const dv = target - car.speed;
+    car.speed += dv > 0 ? Math.min(dv, TUNING.maxAccel * dt) : Math.max(dv, -TUNING.maxBrake * dt);
+    if (car.speed < 0) car.speed = 0;
+
+    let newDist = oldDist + car.speed * dt;
+    if (car.status === 'pitLane' && car.pit && car.pit.phase === 'in') {
+      newDist = Math.min(newDist, car.pit.boxDist);
+    }
+    car.dist = newDist;
+    const ds = newDist - oldDist;
+    const tPrev = this.time - dt;
+
+    // Lateral position (cosmetic: drives side-by-side overtakes on the map).
+    const latTarget = car.passing ? car.passing.side * 0.9 : 0;
+    car.lat += clamp(latTarget - car.lat, -0.8 * dt, 0.8 * dt);
+
+    if (ds <= 0) return;
+
+    // Tyres and fuel.
+    if (car.status !== 'finished') {
+      const spec = COMPOUNDS[car.tyre.compound];
+      const wearMul =
+        TUNING.paceMode[car.paceMode].wear *
+        (1 + 0.2 * car.dirty) *
+        (this.sc.active ? 0.45 : 1) *
+        (car.status === 'pitLane' ? 0.2 : 1);
+      car.tyre.wear += (spec.wearPerLap * track.def.tyreSeverity * car.wearFactor * wearMul * ds) / L;
+      car.tyre.ageLaps += ds / L;
+      const burn =
+        this.burnPerLap *
+        TUNING.engineMode[car.engineMode].fuel *
+        TUNING.paceMode[car.paceMode].fuel *
+        (this.sc.active ? 0.55 : 1);
+      car.fuel = Math.max(0, car.fuel - (burn * ds) / L);
+    }
+
+    // Checkpoint times for accurate gap calculation.
+    let idx = Math.floor(oldDist / CP_LEN) + 1;
+    const lastIdx = Math.floor(newDist / CP_LEN);
+    for (; idx <= lastIdx; idx++) {
+      if (idx >= 0 && idx < car.cpTimes.length) {
+        car.cpTimes[idx] = tPrev + (dt * (idx * CP_LEN - oldDist)) / ds;
+      }
+    }
+
+    const newPos = track.wrap(newDist);
+    const timeAt = (line: number): number => {
+      const offset = (line - oldPos + L) % L;
+      return tPrev + (dt * offset) / ds;
+    };
+
+    // Sector lines.
+    if (crossed(oldPos, newPos, track.sectorLines[0])) {
+      car.sectorMarks[0] = timeAt(track.sectorLines[0]) - car.lapStartTime;
+    }
+    if (crossed(oldPos, newPos, track.sectorLines[1])) {
+      car.sectorMarks[1] = timeAt(track.sectorLines[1]) - car.lapStartTime;
+    }
+
+    if (car.status === 'running') {
+      // DRS detection points.
+      track.drsZones.forEach((zone, zi) => {
+        if (crossed(oldPos, newPos, zone.detect)) {
+          const a = car.ahead;
+          car.drsElig[zi] =
+            a !== null && a.status === 'running' && car.aheadGap / Math.max(a.speed, 15) < 1.0;
+        }
+      });
+      // Pit entry.
+      if (crossed(oldPos, newPos, track.pitEntryS)) this.atPitEntry(car);
+    }
+
+    // Start / finish line (or the pit box, which sits on the line).
+    if (newDist >= (car.lap + 1) * L - 1e-6) {
+      this.onLapComplete(car, tPrev + (dt * ((car.lap + 1) * L - oldDist)) / ds);
+    }
+  }
+
+  private racingTarget(car: CarState, free: number, pos: number, dt: number): number {
+    const { track } = this;
+    const L = track.length;
+    let target = free;
+
+    // Safety car bunching: non-leaders may close up when there is a gap.
+    const ahead = car.ahead;
+    if (this.sc.active && ahead && car.aheadGap > 30) target *= 1.15;
+
+    // Passing state.
+    if (car.passing) {
+      const victim = this.byId.get(car.passing.targetId);
+      if (this.sc.active || !victim || victim.status !== 'running') {
+        car.passing = null;
+        car.passCooldown = 4;
+      } else if (this.relDist(car, victim) > 6) {
+        this.logOvertake(car, victim);
+        car.passing = null;
+        car.passCooldown = 8;
+      } else if (this.time > car.passing.until) {
+        car.passing = null;
+        car.passCooldown = 6;
+      }
+    }
+
+    // DRS.
+    const zone = track.drsAt(pos);
+    car.drsOn = !this.sc.active && car.lap >= 2 && zone >= 0 && car.drsElig[zone];
+    if (car.drsOn) target *= TUNING.drsSpeedBoost;
+    if (car.passing) target *= TUNING.passBoostFactor;
+
+    // Traffic.
+    car.dirty = 0;
+    car.passCooldown = Math.max(0, car.passCooldown - dt);
+    if (ahead && car.aheadGap < 90) {
+      const gapT = car.aheadGap / Math.max(ahead.speed, 15);
+      const ignoring = car.passing !== null && car.passing.targetId === ahead.id;
+      if (!this.sc.active && gapT < TUNING.dirtyAirRange) car.dirty = 1 - gapT / TUNING.dirtyAirRange;
+
+      let blocked = false;
+      if (!ignoring) {
+        const hard = this.sc.active ? 12 : 7;
+        const cap = ahead.speed + (car.aheadGap - hard) * 0.9;
+        if (target > cap) {
+          target = Math.max(0, cap);
+          blocked = true;
+        }
+      }
+
+      if (blocked && !this.sc.active && !car.passing && car.passCooldown <= 0 && gapT < 1.1) {
+        const lapped = car.dist - ahead.dist > L * 0.5;
+        let p: number;
+        if (lapped) {
+          p = 0.9;
+        } else {
+          const advantage =
+            ahead.paceNow -
+            car.paceNow +
+            (car.drsOn ? TUNING.drsAdvantage : 0) +
+            (car.driver.ratings.racecraft - ahead.driver.ratings.racecraft) * 0.004;
+          const ease = track.overtakeAt(pos) / track.def.overtakingDifficulty;
+          p = Math.max(0, advantage + 0.15) * TUNING.passRate * ease;
+        }
+        if (car.rng.next() < p * dt) {
+          car.passing = {
+            targetId: ahead.id,
+            until: this.time + 9,
+            side: (car.lap + car.grid) % 2 === 0 ? 1 : -1,
+          };
+        }
+      }
+    }
+    return target;
+  }
+
+  private logOvertake(car: CarState, victim: CarState): void {
+    const lapped = car.dist - victim.dist > this.track.length * 0.5;
+    if (lapped) return;
+    this.overtakeCount++;
+    const pos = this.standings().indexOf(car) + 1;
+    this.addEvent('overtake', `${car.driver.code} passes ${victim.driver.code} for P${pos}`, car.id);
+  }
+
+  // ------------------------------------------------------------ pit stops
+
+  private atPitEntry(car: CarState): void {
+    if (this.raceOver) return;
+    const inProgress = car.lap + 1;
+    if (inProgress >= this.totalLaps) return;
+    let compound: Compound | null = car.pitRequest;
+    const next = car.plan.stops[0];
+    if (compound === null && next && inProgress >= next.lap) compound = next.compound;
+    if (compound === null) return;
+
+    const L = this.track.length;
+    car.status = 'pitLane';
+    car.currentLapPit = true;
+    car.passing = null;
+    car.drsOn = false;
+    car.pit = {
+      phase: 'in',
+      boxDist: (car.lap + 1) * L,
+      exitDist: (car.lap + 1) * L + this.track.pitExitM,
+      stopEnd: 0,
+      compound,
+    };
+    car.pitRequest = null;
+  }
+
+  private stopDuration(car: CarState): number {
+    const base = 2.2 + (100 - car.team.car.pitCrew) * 0.02;
+    let d = car.rng.normal(base, 0.25);
+    if (car.rng.chance(0.04)) d += car.rng.range(2, 5);
+    return Math.max(1.8, d);
+  }
+
+  private pitLaneTarget(car: CarState, racing: number): number {
+    const ps = car.pit;
+    if (!ps) {
+      car.status = 'running';
+      return racing;
+    }
+    if (ps.phase === 'in') {
+      const remaining = ps.boxDist - car.dist;
+      if (remaining <= 0.3) {
+        car.dist = ps.boxDist;
+        car.speed = 0;
+        ps.phase = 'stopped';
+        const start = Math.max(this.time, this.boxFreeAt.get(car.team.id) ?? 0);
+        const duration = this.stopDuration(car);
+        ps.stopEnd = start + duration;
+        this.boxFreeAt.set(car.team.id, ps.stopEnd);
+        car.stops.push({ lap: car.lap + 1, compound: ps.compound, duration });
+        return 0;
+      }
+      return Math.min(TUNING.pitSpeed, Math.sqrt(2 * TUNING.pitDecel * remaining), racing);
+    }
+    if (ps.phase === 'stopped') {
+      if (this.time < ps.stopEnd) return 0;
+      this.completeStop(car, ps);
+      ps.phase = 'out';
+      return Math.min(TUNING.pitSpeed, racing);
+    }
+    if (car.dist >= ps.exitDist) {
+      car.status = 'running';
+      car.pit = null;
+      return racing;
+    }
+    return Math.min(TUNING.pitSpeed, racing);
+  }
+
+  private completeStop(car: CarState, ps: PitState): void {
+    const wasPlanned = car.plan.stops.length > 0 && car.plan.stops[0].compound === ps.compound;
+    car.tyre = { compound: ps.compound, wear: 0, ageLaps: 0 };
+    if (!car.usedCompounds.includes(ps.compound)) car.usedCompounds.push(ps.compound);
+    car.damage = 0;
+    const stop = car.stops[car.stops.length - 1];
+    this.addEvent(
+      'pit',
+      `${car.driver.code} pits for ${COMPOUNDS[ps.compound].name.toLowerCase()} tyres (${stop ? stop.duration.toFixed(1) : '?'}s)`,
+      car.id,
+    );
+    // Update the plan for the remaining laps.
+    if (wasPlanned) {
+      car.plan.stops.shift();
+    } else {
+      const ctx = this.planContext(car, ps.compound, 0);
+      car.plan = planStrategy(
+        car.isPlayer ? ctx : { ...ctx, jitter: { rng: car.rng, seconds: TUNING.aiStrategyJitter / 2 } },
+      );
+    }
+  }
+
+  private chooseNextCompound(car: CarState): Compound {
+    const ctx = this.planContext(car, null, 0);
+    const plan = planStrategy({ ...ctx, lapsRemaining: Math.max(1, ctx.lapsRemaining - 1) });
+    return plan.startCompound;
+  }
+
+  // -------------------------------------------------------------- laps
+
+  private isLeader(car: CarState): boolean {
+    for (const o of this.cars) {
+      if (o !== car && o.status !== 'out' && o.dist > car.dist) return false;
+    }
+    return true;
+  }
+
+  private onLapComplete(car: CarState, tCross: number): void {
+    const lapTime = tCross - car.lapStartTime;
+    const m1 = car.sectorMarks[0] ?? lapTime / 3;
+    const m2 = car.sectorMarks[1] ?? (2 * lapTime) / 3;
+    const sectors: [number, number, number] = [m1, m2 - m1, lapTime - m2];
+    const wasLeader = this.isLeader(car);
+    const clean = !car.currentLapPit && !car.currentLapSC && car.lap >= 1;
+    const lapNo = car.lap + 1;
+    car.laps.push({
+      lap: lapNo,
+      time: lapTime,
+      sectors,
+      compound: car.tyre.compound,
+      tyreAge: car.tyre.ageLaps,
+      pit: car.currentLapPit,
+      clean,
+    });
+    car.lastLap = lapTime;
+    if (clean) {
+      if (car.bestLap === null || lapTime < car.bestLap) car.bestLap = lapTime;
+      if (!this.fastestLap || lapTime < this.fastestLap.time) {
+        const first = this.fastestLap === null;
+        this.fastestLap = { carId: car.id, time: lapTime, lap: lapNo };
+        if (!first || lapNo > 1) {
+          this.addEvent('fastest', `Fastest lap: ${car.driver.code} ${formatLap(lapTime)}`, car.id);
+        }
+      }
+    }
+
+    car.lap = lapNo;
+    car.lapStartTime = tCross;
+    car.sectorMarks = [null, null];
+    car.currentLapSC = this.sc.active;
+    car.currentLapPit = car.status === 'pitLane';
+    car.lapNoise = car.rng.normal(0, this.lapSigma(car));
+    car.errorPenalty = 0;
+    if (car.status === 'running' && car.rng.chance((100 - car.driver.ratings.consistency) * 0.0003)) {
+      car.errorPenalty = car.rng.range(2, 6);
+      this.addEvent('incident', `${car.driver.code} locks up and runs wide`, car.id);
+    }
+
+    // Safety car countdown happens when the leader crosses the line.
+    if (this.sc.active && wasLeader) {
+      this.sc.lapsLeft--;
+      if (this.sc.lapsLeft === 1) this.addEvent('safetycar', 'Safety car in this lap');
+      if (this.sc.lapsLeft <= 0) this.endSafetyCar();
+    }
+
+    // Race end.
+    if (!this.raceOver && car.lap >= this.totalLaps) {
+      this.raceOver = true;
+      this.addEvent('finish', `${car.driver.code} wins the race!`, car.id);
+    }
+    if (this.raceOver && car.status !== 'out') {
+      car.status = 'finished';
+      car.pit = null;
+      car.finishTime = tCross;
+      if (car.usedCompounds.length < 2) {
+        car.penaltySeconds = TUNING.compoundRulePenalty;
+        this.addEvent(
+          'penalty',
+          `${car.driver.code}: +${TUNING.compoundRulePenalty}s for using only one compound`,
+          car.id,
+        );
+      }
+      this.standingsCache = null;
+      return;
+    }
+
+    if ((!car.isPlayer || car.auto) && car.status === 'running') this.aiLapStart(car);
+  }
+
+  private aiLapStart(car: CarState): void {
+    const remaining = this.totalLaps - car.lap;
+    const wear = car.tyre.wear;
+    const next = car.plan.stops[0];
+
+    // Pace and engine modes.
+    const gap = this.gapToAhead(car);
+    let pace: PaceMode = 'standard';
+    if (this.sc.active) pace = 'conserve';
+    else if (remaining <= 3 && wear < 0.9) pace = 'push';
+    else if (wear > 0.8 && !(next && next.lap - car.lap <= 1)) pace = 'conserve';
+    else if (gap !== null && gap < 1.2 && wear < 0.65) pace = 'push';
+    car.paceMode = pace;
+    const spare = car.fuel - remaining * this.burnPerLap;
+    car.engineMode = spare < 0.3 ? 'lean' : spare > 2.5 && remaining <= 5 ? 'rich' : 'standard';
+
+    // Unscheduled stops.
+    if (car.pitRequest !== null || remaining <= 2) return;
+    if (wear > 0.93 && (!next || next.lap > car.lap + 1)) {
+      car.pitRequest = this.chooseNextCompound(car);
+    } else if (this.sc.active && car.tyre.ageLaps >= 6 && remaining >= 8) {
+      car.pitRequest = next && next.lap - car.lap <= 10 ? next.compound : this.chooseNextCompound(car);
+    }
+  }
+
+  // ----------------------------------------------------- classification
+
+  /** Cars in race order. The result is cached until the next step. */
+  standings(): CarState[] {
+    if (this.standingsCache) return this.standingsCache;
+    const order = [...this.cars].sort((a, b) => {
+      if ((a.status === 'out') !== (b.status === 'out')) return a.status === 'out' ? 1 : -1;
+      if (a.lap !== b.lap) return b.lap - a.lap;
+      const af = a.finishTime !== null;
+      const bf = b.finishTime !== null;
+      if (a.finishTime !== null && b.finishTime !== null) {
+        return a.finishTime + a.penaltySeconds - (b.finishTime + b.penaltySeconds);
+      }
+      if (af !== bf) return af ? -1 : 1;
+      return b.dist - a.dist;
+    });
+    this.standingsCache = order;
+    return order;
+  }
+
+  /** Seconds between `behind` and the car in front of it, or null if unknown. */
+  private timeBetween(behind: CarState, ahead: CarState): number | null {
+    const d = behind.dist;
+    if (d < 0) return null;
+    const idx = Math.floor(d / CP_LEN);
+    if (idx + 1 >= ahead.cpTimes.length) return null;
+    const t0 = ahead.cpTimes[idx];
+    if (Number.isNaN(t0)) return null;
+    const t1 = ahead.cpTimes[idx + 1];
+    const frac = (d - idx * CP_LEN) / CP_LEN;
+    const tAhead = Number.isNaN(t1)
+      ? t0 + (d - idx * CP_LEN) / Math.max(ahead.speed, 10)
+      : t0 + (t1 - t0) * frac;
+    return Math.max(0, this.time - tAhead);
+  }
+
+  /** Gap (s) to the car directly ahead in the classification. */
+  gapToAhead(car: CarState): number | null {
+    const order = this.standings();
+    const i = order.indexOf(car);
+    if (i <= 0 || car.status === 'out') return null;
+    return this.timeBetween(car, order[i - 1]);
+  }
+
+  /** Gap (s) to the leader, or the number of laps down. */
+  gapToLeader(car: CarState): { seconds: number | null; lapsDown: number } {
+    const lead = this.standings()[0];
+    if (!lead || lead === car) return { seconds: 0, lapsDown: 0 };
+    const lapsDown = Math.floor((lead.dist - car.dist) / this.track.length);
+    if (lapsDown >= 1) return { seconds: null, lapsDown };
+    return { seconds: this.timeBetween(car, lead), lapsDown: 0 };
+  }
+
+  /** Final classification (valid once the race is finished). */
+  results(): ResultRow[] {
+    const order = this.standings();
+    const winner = order[0];
+    const winnerTime =
+      winner && winner.finishTime !== null ? winner.finishTime + winner.penaltySeconds : null;
+    return order.map((car, i) => {
+      const finished = car.finishTime !== null;
+      const timeS = car.finishTime !== null ? car.finishTime + car.penaltySeconds : null;
+      const sameLap = winner !== undefined && car.lap === winner.lap;
+      return {
+        position: i + 1,
+        carId: car.id,
+        grid: car.grid,
+        laps: car.lap,
+        finished,
+        timeS,
+        gapS: timeS !== null && sameLap && winnerTime !== null ? timeS - winnerTime : null,
+        lapsDown: winner ? winner.lap - car.lap : 0,
+        bestLap: car.bestLap,
+        pitStops: car.stops.length,
+        penaltyS: car.penaltySeconds,
+        outReason: car.outReason,
+      };
+    });
+  }
+
+  private finishRace(): void {
+    if (this.phase === 'finished') return;
+    this.phase = 'finished';
+    this.raceOver = true;
+    this.standingsCache = null;
+  }
+
+  private addEvent(kind: EventKind, message: string, carIdValue?: string): void {
+    this.events.push({
+      id: this.eventSeq++,
+      t: this.time,
+      lap: Math.min(this.totalLaps, this.leaderLap() + 1),
+      kind,
+      carId: carIdValue,
+      message,
+    });
+  }
+}
