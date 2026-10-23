@@ -1,7 +1,7 @@
 {
   "name": "pitwall",
   "version": "0.1.0",
-  "description": "A browser-based F1 team management and race strategy game with a deterministic simulation engine",
+  "description": "A browser-based Formula-style team management and race strategy game with a deterministic simulation engine",
   "private": true,
   "type": "module",
   "license": "MIT",

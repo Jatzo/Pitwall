@@ -124,12 +124,13 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .tower { font-size: 12.5px; }
 .tower .trow > span { min-width: 0; white-space: nowrap; overflow: hidden; }
 .tower .trow {
-  display: grid; grid-template-columns: 20px 4px 34px 56px 62px 46px 30px 20px; gap: 5px; align-items: center;
+  display: grid; grid-template-columns: 20px 4px 36px 62px 64px 46px 30px 30px; gap: 5px; align-items: center;
   padding: 3px 6px; border-radius: 4px; cursor: pointer; border: 1px solid transparent;
 }
 .tower .thead { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; cursor: default; }
 .tower .trow:hover:not(.thead) { background: var(--panel-2); }
 .tower .trow.sel { border-color: #3a4666; background: #1a2030; }
+.tower .trow:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
 .tower .trow.mine .code { font-weight: 800; }
 .tower .trow.out { opacity: 0.45; }
 .tower .pos { text-align: right; color: var(--muted); }

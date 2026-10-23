@@ -12,6 +12,19 @@ interface Props {
   frame: number;
 }
 
+/** Black or white, whichever reads better on a team colour. */
+function inkFor(hex: string): string {
+  const n = Number.parseInt(hex.replace('#', ''), 16);
+  if (Number.isNaN(n)) return '#fff';
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Contrast against black beats contrast against white above about 0.18.
+  return luminance > 0.18 ? '#0b0d12' : '#fff';
+}
+
 function interp(prev: number, cur: number, alpha: number): number {
   return prev + (cur - prev) * alpha;
 }
@@ -89,6 +102,7 @@ const TrackLayer = memo(function TrackLayer({ sim }: { sim: RaceSim }) {
 
 function Marker({
   car,
+  position,
   x,
   y,
   r,
@@ -97,6 +111,7 @@ function Marker({
   onSelect,
 }: {
   car: CarState;
+  position: number;
   x: number;
   y: number;
   r: number;
@@ -110,7 +125,17 @@ function Marker({
       {selected && <circle r={r * 2.1} fill="none" stroke="#fff" strokeWidth={r * 0.28} />}
       {car.isPlayer && <circle r={r * 1.45} fill="none" stroke={car.team.colors.secondary} strokeWidth={r * 0.3} />}
       <circle r={r} fill={car.team.colors.primary} stroke={pitting ? '#fff' : '#0b0d12'} strokeWidth={r * 0.28} />
-      {car.drsOn && <circle r={r * 0.4} fill="#2fd27a" />}
+      <text
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={r * (position >= 10 ? 1.05 : 1.25)}
+        fontWeight={800}
+        fill={inkFor(car.team.colors.primary)}
+        style={{ pointerEvents: 'none' }}
+      >
+        {position}
+      </text>
+      {car.drsOn && <circle cx={r * 0.85} cy={-r * 0.85} r={r * 0.32} fill="#2fd27a" stroke="#0b0d12" strokeWidth={r * 0.1} />}
       {label && (
         <text
           x={r * 1.8}
@@ -135,7 +160,7 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
   const pad = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY) * 0.08;
   const vb = `${(t.bounds.minX - pad).toFixed(0)} ${(t.bounds.minY - pad).toFixed(0)} ${(t.bounds.maxX - t.bounds.minX + pad * 2).toFixed(0)} ${(t.bounds.maxY - t.bounds.minY + pad * 2).toFixed(0)}`;
   const size = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY);
-  const r = size * 0.0125;
+  const r = size * 0.015;
 
   const order = sim.standings();
   const leader = order[0];
@@ -158,7 +183,7 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
         const y = p.y - Math.cos(p.heading) * lat * (size * 0.0012);
         const label = showAllLabels || car.isPlayer || car.id === selectedId || car === leader;
         return (
-          <Marker key={car.id} car={car} x={x} y={y} r={r} selected={car.id === selectedId} label={label} onSelect={onSelect} />
+          <Marker key={car.id} car={car} position={order.indexOf(car) + 1} x={x} y={y} r={r} selected={car.id === selectedId} label={label} onSelect={onSelect} />
         );
       })}
       {sc && (

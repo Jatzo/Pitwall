@@ -1,6 +1,6 @@
 import type { ResultRow } from './race.ts';
 
-/** Points for positions 1-10, as in the modern F1 system. */
+/** Points for positions 1-10, as in the modern grand prix system. */
 export const POINTS_TABLE: readonly number[] = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 
 export function pointsForPosition(position: number): number {
