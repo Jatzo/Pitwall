@@ -2,9 +2,10 @@ import { formatGap, formatLap } from '../engine/format.ts';
 import { burnPerLap, fuelLapsSpare, rejoinEstimate, tyreLapsLeft, wearRatesFor } from '../engine/insights.ts';
 import type { CarState, RaceSim } from '../engine/race.ts';
 import { TUNING } from '../engine/tuning.ts';
-import { ALL_COMPOUNDS, CLIFF_START, COMPOUNDS } from '../engine/tyres.ts';
+import { CLIFF_START, COMPOUNDS, PIT_COMPOUNDS } from '../engine/tyres.ts';
 import type { EngineMode, PaceMode, RaceCommand, StrategyPlan } from '../engine/types.ts';
 import { TeamLogo } from './TeamLogo.tsx';
+import { Conditions } from './Conditions.tsx';
 import { PlanEditor } from './PlanEditor.tsx';
 
 interface Props {
@@ -125,6 +126,8 @@ export function CarPanel({ sim, car, dispatch }: Props) {
         </div>}
       </div>
 
+      <Conditions sim={sim} />
+
       {mine && !out && (
         <>
           <div className="panel">
@@ -161,7 +164,7 @@ export function CarPanel({ sim, car, dispatch }: Props) {
             <h3>Pit wall</h3>
             <div className="row wrap" style={{ marginBottom: 10 }}>
               <span className="muted">Box this lap for</span>
-              {ALL_COMPOUNDS.map((c) => (
+              {PIT_COMPOUNDS.map((c) => (
                 <button
                   key={c}
                   className={`btn small ${car.pitRequest === c ? 'active' : ''}`}

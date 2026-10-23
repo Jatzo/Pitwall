@@ -194,3 +194,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .calendar { grid-template-columns: 1fr; }
   .calendar-round { grid-template-columns: 1fr; }
 }
+
+/* ----- conditions ----- */
+.forecast { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.forecast > div { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; }
+.forecast i { width: 100%; height: 8px; border-radius: 2px; background: #3b8bff; display: block; }
+.status-pill.rain { background: #12305c; color: #9cc4ff; }

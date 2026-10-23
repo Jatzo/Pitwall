@@ -4,7 +4,7 @@ import { defaultTeams } from '../data/teams.ts';
 import { TRACKS, fullRaceLaps } from '../data/tracks.ts';
 import { RaceSim } from './race.ts';
 import { planStrategy } from './strategy.ts';
-import { COMPOUNDS, tyrePenalty } from './tyres.ts';
+import { COMPOUNDS, bestClass, tyrePenalty, weatherPenalty, wetWearFactor } from './tyres.ts';
 import type { Compound, StrategyPlan } from './types.ts';
 
 describe('tyres', () => {
@@ -25,6 +25,33 @@ describe('tyres', () => {
     assert.ok(COMPOUNDS.M.paceDelta < COMPOUNDS.H.paceDelta);
     assert.ok(COMPOUNDS.S.wearPerLap > COMPOUNDS.M.wearPerLap);
     assert.ok(COMPOUNDS.M.wearPerLap > COMPOUNDS.H.wearPerLap);
+  });
+});
+
+describe('tyres in changing conditions', () => {
+  it('suit slicks when dry, intermediates when damp, and full wets when soaked', () => {
+    assert.equal(bestClass(0), 'slick');
+    assert.equal(bestClass(0.35), 'inter');
+    assert.equal(bestClass(0.8), 'wet');
+  });
+
+  it('cost nothing extra on a dry track on slicks, and punish the wrong tyre', () => {
+    for (const c of ['S', 'M', 'H'] as const) assert.equal(weatherPenalty(c, 0), 0);
+    assert.ok(weatherPenalty('I', 0) > 1, 'intermediates are slow on a dry track');
+    assert.ok(weatherPenalty('M', 0.5) > weatherPenalty('I', 0.5) + 3, 'slicks are far slower on a wet track');
+    assert.ok(weatherPenalty('W', 0.3) > weatherPenalty('I', 0.3), 'full wets are slower than intermediates when damp');
+  });
+
+  it('keeps the current tyre near a crossover rather than flip-flopping', () => {
+    const edge = 0.14;
+    assert.equal(bestClass(edge + 0.02, 'slick'), 'slick');
+    assert.equal(bestClass(edge - 0.02, 'inter'), 'inter');
+  });
+
+  it('wear wet tyres out fast on a dry line, and leave dry wear unchanged', () => {
+    for (const c of ['S', 'M', 'H'] as const) assert.equal(wetWearFactor(c, 0), 1);
+    assert.ok(wetWearFactor('I', 0) > 2 * wetWearFactor('I', 0.4));
+    assert.ok(wetWearFactor('W', 0.1) > wetWearFactor('W', 0.8));
   });
 });
 
@@ -76,8 +103,8 @@ describe('strategy planner', () => {
       currentWear: 0,
       used: [] as Compound[],
     };
-    const gentle = planStrategy({ ...base, wearRates: { S: 0.04, M: 0.022, H: 0.015 } });
-    const harsh = planStrategy({ ...base, wearRates: { S: 0.09, M: 0.055, H: 0.04 } });
+    const gentle = planStrategy({ ...base, wearRates: { S: 0.04, M: 0.022, H: 0.015, I: 0.03, W: 0.025 } });
+    const harsh = planStrategy({ ...base, wearRates: { S: 0.09, M: 0.055, H: 0.04, I: 0.03, W: 0.025 } });
     assert.ok(harsh.stops.length >= gentle.stops.length);
     assert.ok(harsh.stops.length >= 2);
   });

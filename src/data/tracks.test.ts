@@ -11,6 +11,7 @@ describe('circuits', () => {
     assert.equal(new Set(TRACKS.map((t) => t.name)).size, TRACKS.length);
     for (const t of TRACKS) {
       assert.ok(t.summary && t.summary.length > 10, `${t.id} needs a summary`);
+      assert.ok(t.rainChance !== undefined && t.rainChance >= 0 && t.rainChance <= 0.6, `${t.id} needs a chance of rain`);
       const sum = t.weights.power + t.weights.aero + t.weights.chassis;
       assert.ok(Math.abs(sum - 1) < 1e-9, `${t.id} weights sum to ${sum}`);
     }

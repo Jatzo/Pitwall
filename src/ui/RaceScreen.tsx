@@ -4,6 +4,7 @@ import type { RaceConfig } from '../engine/race.ts';
 import type { RaceCommand } from '../engine/types.ts';
 import { CarPanel } from './CarPanel.tsx';
 import { DecisionPrompt } from './DecisionPrompt.tsx';
+import { weatherWord } from './Conditions.tsx';
 import { EventFeed } from './EventFeed.tsx';
 import { nextMoment, watchMoments } from './moments.ts';
 import type { Moment } from './moments.ts';
@@ -169,6 +170,11 @@ export function RaceScreen({ config, onFinish }: Props) {
         <span className="muted">{sim.track.def.location}</span>
         {pill}
         <span className="num">Lap {done ? sim.totalLaps : lap} / {sim.totalLaps}</span>
+        {(sim.rain > 0 || sim.wetness > 0) && (
+          <span className="status-pill rain">
+            {weatherWord(sim.rain, sim.wetness).toUpperCase()} · {Math.round(sim.wetness * 100)}% WET
+          </span>
+        )}
         <span style={{ flex: 1 }} />
         {sim.phase === 'grid' ? (
           <button className="btn primary" onClick={lightsOut}>Lights out</button>

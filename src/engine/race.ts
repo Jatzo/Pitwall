@@ -17,7 +17,10 @@ import type { PlanContext, WearRates } from './strategy.ts';
 import { Track } from './track.ts';
 import type { TrackDef } from './track.ts';
 import { TUNING } from './tuning.ts';
-import { COMPOUNDS, tyrePenalty } from './tyres.ts';
+import { COMPOUNDS, bestClass, scaledWearRates, tyreClass, tyrePenalty, weatherPenalty, wetWearFactor } from './tyres.ts';
+import type { TyreClass } from './tyres.ts';
+import { DRY_WEATHER, RAIN_THRESHOLD, rainAt } from './weather.ts';
+import type { WeatherTimeline } from './weather.ts';
 import type {
   Compound,
   DriverDef,
@@ -108,6 +111,10 @@ export interface CarState {
   passCooldown: number;
 
   reaction: number;
+  /** How readily this team gambles on a weather stop: the gain it needs, as a share of a pit stop's cost. */
+  readonly weatherCaution: number;
+  /** Lap of the last stop made for the conditions, so cars do not swap tyres back and forth. */
+  weatherStopLap: number;
   finishTime: number | null;
   penaltySeconds: number;
   outReason: string | null;
@@ -158,6 +165,8 @@ export interface RaceConfig {
   playerTeamId: string | null;
   /** Pre-set strategies, keyed by car id (used for player cars). */
   strategies?: Record<string, StrategyPlan>;
+  /** The race's rain. Absent means a dry race. */
+  weather?: WeatherTimeline;
 }
 
 export interface ResultRow {
@@ -178,6 +187,8 @@ export interface ResultRow {
 }
 
 const CP_LEN = 10; // checkpoint spacing for gap timing, metres
+/** Laps ahead a team looks when weighing a stop for the conditions. */
+const WEATHER_HORIZON_LAPS = 20;
 
 export function carId(team: TeamDef, index: 0 | 1): string {
   return `${team.id}:${index}`;
@@ -256,6 +267,12 @@ export class RaceSim {
   /** Number of safety car periods so far. */
   scCount = 0;
   overtakeCount = 0;
+  readonly weather: WeatherTimeline;
+  /** Rain falling now, 0 to 1. */
+  rain = 0;
+  /** Water on the racing line and off it, 0 (dry) to 1 (standing water). Cars dry the line. */
+  wetness = 0;
+  offlineWetness = 0;
 
   private readonly byId = new Map<string, CarState>();
   private readonly eventRng: Rng;
@@ -269,6 +286,13 @@ export class RaceSim {
     this.track = new Track(cfg.track);
     this.totalLaps = cfg.laps;
     this.eventRng = new Rng(mixSeed(cfg.seed, 'race-control'));
+    this.weather = cfg.weather ?? DRY_WEATHER;
+    // If it is already raining at the start, the track is wet from the first lap.
+    this.rain = rainAt(this.weather, 0);
+    if (this.rain > RAIN_THRESHOLD) {
+      this.wetness = Math.min(1, this.rain * 1.2);
+      this.offlineWetness = this.wetness;
+    }
     this.burnPerLap = (TUNING.fuelPerLapRef * this.track.length) / 5300;
 
     const defs = new Map<string, { team: TeamDef; driver: DriverDef }>();
@@ -343,6 +367,9 @@ export class RaceSim {
       passing: null,
       passCooldown: 0,
       reaction: 0.3,
+      // A separate stream, so dry races draw exactly what they always drew.
+      weatherCaution: new Rng(mixSeed(cfg.seed, `${id}:weather`)).range(0.5, 1.3),
+      weatherStopLap: -99,
       finishTime: null,
       penaltySeconds: 0,
       outReason: null,
@@ -366,6 +393,8 @@ export class RaceSim {
       const ctx = this.planContext(car, null, 0);
       plan = planStrategy(isPlayer ? ctx : { ...ctx, jitter: { rng, seconds: TUNING.aiStrategyJitter } });
       if (!isPlayer) plan = jitterStops(plan, rng, 3, 4, this.totalLaps - 3);
+      const startClass = this.wetness > 0 ? bestClass(this.wetness) : 'slick';
+      if (startClass !== 'slick') plan = { startCompound: startClass === 'inter' ? 'I' : 'W', stops: [] };
     }
     car.plan = { startCompound: plan.startCompound, stops: plan.stops.map((s) => ({ ...s })) };
     car.tyre = { compound: plan.startCompound, wear: 0, ageLaps: 0 };
@@ -374,12 +403,7 @@ export class RaceSim {
   }
 
   private wearRates(car: CarState): WearRates {
-    const k = this.track.def.tyreSeverity * car.wearFactor;
-    return {
-      S: COMPOUNDS.S.wearPerLap * k,
-      M: COMPOUNDS.M.wearPerLap * k,
-      H: COMPOUNDS.H.wearPerLap * k,
-    };
+    return scaledWearRates(this.track.def.tyreSeverity * car.wearFactor);
   }
 
   private planContext(car: CarState, current: Compound | null, wear: number): PlanContext {
@@ -409,11 +433,7 @@ export class RaceSim {
     return planStrategy({
       lapsRemaining: laps,
       lapsCompleted: 0,
-      wearRates: {
-        S: COMPOUNDS.S.wearPerLap * k,
-        M: COMPOUNDS.M.wearPerLap * k,
-        H: COMPOUNDS.H.wearPerLap * k,
-      },
+      wearRates: scaledWearRates(k),
       pitLoss: TUNING.pitLossPlan,
       currentCompound: startCompound,
       currentWear: 0,
@@ -470,6 +490,7 @@ export class RaceSim {
     this.time += dt;
     this.standingsCache = null;
     this.computeNeighbours();
+    this.updateTrack(dt);
     this.updateRaceControl(dt);
     for (const car of this.cars) this.updateCar(car, dt);
     const done = this.cars.every((c) => c.status === 'out' || c.status === 'finished');
@@ -511,16 +532,39 @@ export class RaceSim {
     return this.standings().find((c) => c.status !== 'out') ?? null;
   }
 
+  /**
+   * Rain wets the track towards a level set by its strength; without rain it
+   * dries. Running cars clear the racing line, so the line dries several
+   * times faster than the rest of the track (the drying line).
+   */
+  private updateTrack(dt: number): void {
+    const rain = rainAt(this.weather, this.time);
+    this.rain = rain;
+    if (rain === 0 && this.wetness === 0 && this.offlineWetness === 0) return;
+    const target = rain > RAIN_THRESHOLD ? Math.min(1, rain * 1.2) : 0;
+    const running = this.cars.filter((c) => c.status === 'running').length / this.cars.length;
+    const lineDrying = TUNING.dryingSeconds / (0.3 + 0.7 * running);
+    const approach = (value: number, dryingSeconds: number): number => {
+      const tau = target > value ? TUNING.wettingSeconds / Math.max(rain, 0.05) : dryingSeconds;
+      const next = value + ((target - value) * dt) / tau;
+      // Snap back to exactly dry, so a dried-out track behaves like one that never got wet.
+      return target === 0 && next < 0.002 ? 0 : next;
+    };
+    this.wetness = approach(this.wetness, lineDrying);
+    this.offlineWetness = approach(this.offlineWetness, TUNING.offlineDryingSeconds);
+  }
+
   private updateRaceControl(dt: number): void {
     if (this.raceOver || this.sc.active) return;
     if (this.leaderLap() >= this.totalLaps - 2) return;
     const perSecond = incidentRatePerSecond(this.totalLaps, referenceRaceLaps(this.track.def), this.track.refLap);
     const startMultiplier = this.time < 30 ? 25 : 1;
-    if (!this.eventRng.chance(perSecond * startMultiplier * dt)) return;
+    const wetMultiplier = 1 + TUNING.wetIncidentFactor * this.wetness;
+    if (!this.eventRng.chance(perSecond * startMultiplier * wetMultiplier * dt)) return;
 
     const candidates = this.cars.filter((c) => c.status === 'running' && this.time > c.reaction);
     if (candidates.length === 0) return;
-    const victim = this.eventRng.pick(candidates);
+    const victim = this.wetness > 0 ? this.pickWetVictim(candidates) : this.eventRng.pick(candidates);
     if (this.eventRng.chance(0.5)) {
       this.addEvent('incident', `${victim.driver.code} is out after contact!`, victim.id);
       this.retire(victim, 'Collision', 0.85);
@@ -532,6 +576,17 @@ export class RaceSim {
         this.addEvent('info', `${victim.driver.code}: "I've got damage, we should pit."`, victim.id);
       }
     }
+  }
+
+  /** On a wet track, cars on the wrong tyres are far more likely to be the ones that crash. */
+  private pickWetVictim(candidates: CarState[]): CarState {
+    const weights = candidates.map((c) => 1 + 3 * Math.max(0, weatherPenalty(c.tyre.compound, this.wetness) - 1));
+    let roll = this.eventRng.next() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < candidates.length; i++) {
+      roll -= weights[i];
+      if (roll <= 0) return candidates[i];
+    }
+    return candidates[candidates.length - 1];
   }
 
   private deploySafetyCar(reason: string): void {
@@ -603,7 +658,9 @@ export class RaceSim {
       car.damage +
       car.errorPenalty +
       car.dirty * TUNING.dirtyAirSeconds -
-      rubber
+      rubber +
+      weatherPenalty(car.tyre.compound, this.wetness) +
+      TUNING.wetTrackSeconds * this.wetness
     );
   }
 
@@ -688,7 +745,8 @@ export class RaceSim {
         TUNING.paceMode[car.paceMode].wear *
         (1 + 0.2 * car.dirty) *
         (this.sc.active ? 0.45 : 1) *
-        (car.status === 'pitLane' ? 0.2 : 1);
+        (car.status === 'pitLane' ? 0.2 : 1) *
+        wetWearFactor(car.tyre.compound, this.wetness);
       car.tyre.wear += (spec.wearPerLap * track.def.tyreSeverity * car.wearFactor * wearMul * ds) / L;
       car.tyre.ageLaps += ds / L;
       const burn =
@@ -768,7 +826,8 @@ export class RaceSim {
 
     // DRS.
     const zone = track.drsAt(pos);
-    car.drsOn = !this.sc.active && car.lap >= 2 && zone >= 0 && car.drsElig[zone];
+    // Race control disables DRS once the track is properly wet.
+    car.drsOn = !this.sc.active && this.wetness < 0.3 && car.lap >= 2 && zone >= 0 && car.drsElig[zone];
     if (car.drsOn) target *= TUNING.drsSpeedBoost;
     if (car.passing) target *= TUNING.passBoostFactor;
 
@@ -801,7 +860,8 @@ export class RaceSim {
             car.paceNow +
             (car.drsOn ? TUNING.drsAdvantage : 0) +
             (car.driver.ratings.racecraft - ahead.driver.ratings.racecraft) * 0.004;
-          const ease = track.overtakeAt(pos) / track.def.overtakingDifficulty;
+          // Off the racing line the track stays wet for longer, so passing gets harder.
+          const ease = (track.overtakeAt(pos) / track.def.overtakingDifficulty) * (1 - 0.6 * this.offlineWetness);
           p = Math.max(0, advantage + 0.15) * TUNING.passRate * ease;
         }
         if (car.rng.next() < p * dt) {
@@ -832,7 +892,11 @@ export class RaceSim {
     if (inProgress >= this.totalLaps) return;
     let compound: Compound | null = car.pitRequest;
     const next = car.plan.stops[0];
-    if (compound === null && next && inProgress >= next.lap) compound = next.compound;
+    if (compound === null && next && inProgress >= next.lap) {
+      // Rival teams fit what the conditions call for, not the dry plan, once rain is about.
+      const aiCar = !car.isPlayer || car.auto;
+      compound = aiCar && (this.wetness > 0 || this.rain > 0) ? this.chooseNextCompound(car) : next.compound;
+    }
     if (compound === null) return;
 
     const L = this.track.length;
@@ -903,8 +967,11 @@ export class RaceSim {
       `${car.driver.code} pits for ${COMPOUNDS[ps.compound].name.toLowerCase()} tyres (${stop ? stop.duration.toFixed(1) : '?'}s)`,
       car.id,
     );
-    // Update the plan for the remaining laps.
-    if (wasPlanned) {
+    // Update the plan for the remaining laps. On wet-weather tyres there is
+    // no dry plan to follow: the next stop comes when the conditions change.
+    if (tyreClass(ps.compound) !== 'slick') {
+      car.plan = { startCompound: ps.compound, stops: [] };
+    } else if (wasPlanned) {
       car.plan.stops.shift();
     } else {
       const ctx = this.planContext(car, ps.compound, 0);
@@ -914,7 +981,46 @@ export class RaceSim {
     }
   }
 
+  /**
+   * Seconds each tyre class would lose to the conditions over the next
+   * `laps` laps, if the rain falling now carries on: the racing line is
+   * projected lap by lap with the same wetting and drying model the race
+   * uses. Rivals judge only the rain they can see; the forecast is the
+   * player's edge.
+   */
+  private projectedClassCost(laps: number): Record<TyreClass, number> {
+    const target = this.rain > RAIN_THRESHOLD ? Math.min(1, this.rain * 1.2) : 0;
+    const running = this.cars.filter((c) => c.status === 'running').length / this.cars.length;
+    const tau =
+      target > this.wetness ? TUNING.wettingSeconds / Math.max(this.rain, 0.05) : TUNING.dryingSeconds / (0.3 + 0.7 * running);
+    const cost: Record<TyreClass, number> = { slick: 0, inter: 0, wet: 0 };
+    for (let k = 1; k <= laps; k++) {
+      const w = target + (this.wetness - target) * Math.exp((-k * this.track.refLap) / tau);
+      cost.slick += weatherPenalty('M', w);
+      cost.inter += weatherPenalty('I', w);
+      cost.wet += weatherPenalty('W', w);
+    }
+    return cost;
+  }
+
+  /** The tyre class that loses least to the conditions over the next laps. */
+  private bestProjectedClass(laps: number): TyreClass {
+    const cost = this.projectedClassCost(laps);
+    let best: TyreClass = 'slick';
+    for (const cls of ['inter', 'wet'] as const) if (cost[cls] < cost[best]) best = cls;
+    return best;
+  }
+
+  /** The tyre to fit at an unplanned stop: whatever suits the conditions, and the planner's pick when dry. */
   private chooseNextCompound(car: CarState): Compound {
+    if (this.wetness === 0 && this.rain === 0) return this.chooseDryCompound(car);
+    const wanted = this.bestProjectedClass(Math.max(1, Math.min(this.totalLaps - car.lap, WEATHER_HORIZON_LAPS)));
+    if (wanted === 'inter') return 'I';
+    if (wanted === 'wet') return 'W';
+    return this.chooseDryCompound(car);
+  }
+
+  private chooseDryCompound(car: CarState): Compound {
     const ctx = this.planContext(car, null, 0);
     const plan = planStrategy({ ...ctx, lapsRemaining: Math.max(1, ctx.lapsRemaining - 1) });
     return plan.startCompound;
@@ -986,7 +1092,9 @@ export class RaceSim {
       car.status = 'finished';
       car.pit = null;
       car.finishTime = tCross;
-      if (car.usedCompounds.length < 2) {
+      // Running intermediates or wets waives the rule, as in real racing.
+      const ranWetTyres = car.usedCompounds.some((c) => tyreClass(c) !== 'slick');
+      if (car.usedCompounds.length < 2 && !ranWetTyres) {
         car.penaltySeconds = TUNING.compoundRulePenalty;
         this.addEvent(
           'penalty',
@@ -1020,12 +1128,33 @@ export class RaceSim {
     const spare = car.fuel - remaining * this.burnPerLap;
     car.engineMode = spare < 0.3 ? 'lean' : spare > 2.5 && remaining <= 5 ? 'rich' : 'standard';
 
+    if (this.wetness > 0 || this.rain > 0 || tyreClass(car.tyre.compound) !== 'slick') this.aiWeatherCall(car, remaining);
+
     // Unscheduled stops.
     if (car.pitRequest !== null || remaining <= 2) return;
     if (wear > 0.93 && (!next || next.lap > car.lap + 1)) {
       car.pitRequest = this.chooseNextCompound(car);
     } else if (this.sc.active && car.tyre.ageLaps >= 6 && remaining >= 8) {
       car.pitRequest = next && next.lap - car.lap <= 10 ? next.compound : this.chooseNextCompound(car);
+    }
+  }
+
+  /**
+   * Switch to the tyre class the conditions call for, once the time it gains
+   * over the next few laps covers the cost of the stop. Each team needs a
+   * different margin before it commits, so rivals split on when to stop.
+   */
+  private aiWeatherCall(car: CarState, remaining: number): void {
+    const horizon = Math.max(1, Math.min(remaining, WEATHER_HORIZON_LAPS));
+    const cost = this.projectedClassCost(horizon);
+    const current: TyreClass = tyreClass(car.tyre.compound);
+    let wanted: TyreClass = 'slick';
+    for (const cls of ['inter', 'wet'] as const) if (cost[cls] < cost[wanted]) wanted = cls;
+    if (wanted === current || car.pitRequest !== null || remaining <= 2) return;
+    if (car.lap - car.weatherStopLap < 3) return;
+    if (cost[current] - cost[wanted] > TUNING.pitLossPlan * car.weatherCaution) {
+      car.pitRequest = this.chooseNextCompound(car);
+      car.weatherStopLap = car.lap;
     }
   }
 

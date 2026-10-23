@@ -53,6 +53,16 @@ export const TUNING = {
   pitLossPlan: 23,
   /** How much AI teams' strategy choices vary (seconds of cost noise). */
   aiStrategyJitter: 6,
+  /** Lap-time cost of a fully wet track for everyone, on top of any wrong-tyre loss. */
+  wetTrackSeconds: 9,
+  /** How quickly rain wets the track: the time constant at full strength (seconds). */
+  wettingSeconds: 150,
+  /** Time constant for the racing line to dry with a full field running (seconds). */
+  dryingSeconds: 600,
+  /** Off the racing line nobody clears the water, so it dries more slowly (seconds). */
+  offlineDryingSeconds: 1500,
+  /** Race incidents rise by this factor times wetness. */
+  wetIncidentFactor: 3,
   /** Penalty if a dry race is finished on a single compound. */
   compoundRulePenalty: 30,
 } as const;

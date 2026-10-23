@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { rejoinEstimate } from '../engine/insights.ts';
 import type { RaceSim } from '../engine/race.ts';
 import { TUNING } from '../engine/tuning.ts';
-import { ALL_COMPOUNDS, COMPOUNDS } from '../engine/tyres.ts';
+import { COMPOUNDS, PIT_COMPOUNDS, bestClass, tyreClass } from '../engine/tyres.ts';
 import type { RaceCommand } from '../engine/types.ts';
+import { CLASS_NAMES, classCostLine } from './Conditions.tsx';
 import { promptCars } from './moments.ts';
 import type { Moment } from './moments.ts';
 
@@ -19,17 +20,30 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
   const resumeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => resumeRef.current?.focus(), []);
 
-  const damaged = moment.carId ? sim.carById(moment.carId) : undefined;
-  const title = moment.kind === 'safetycar' ? 'Safety car deployed' : `${damaged?.driver.code ?? 'Your car'} has damage`;
+  const subject = moment.carId ? sim.carById(moment.carId) : undefined;
+  const code = subject?.driver.code ?? 'Your car';
   const cars = promptCars(sim, moment);
+  const advised = subject ? bestClass(sim.wetness, tyreClass(subject.tyre.compound)) : 'slick';
+  const titles: Record<typeof moment.kind, string> = {
+    safetycar: 'Safety car deployed',
+    damage: `${code} has damage`,
+    rain: 'Rain is falling',
+    conditions: `${code}: ${CLASS_NAMES[advised].toLowerCase()} would be quicker now`,
+  };
+  const bodies: Record<typeof moment.kind, string> = {
+    safetycar:
+      'The field slows and bunches up behind the safety car, so a stop now costs far fewer places than under green flags. Rivals will be deciding too.',
+    damage: 'A stop fixes the damage and costs the usual time in the pit lane.',
+    rain: 'The track is getting wet. Slicks lose time from about 14% wetness, intermediates are quickest from there to about 55%, and full wets after that. Rivals react to the rain they can see; the forecast is yours.',
+    conditions: `The racing line is ${Math.round(sim.wetness * 100)}% wet. ${classCostLine(sim.wetness)}.`,
+  };
+  const title = titles[moment.kind];
 
   return (
     <div className="decision" role="alertdialog" aria-labelledby="decision-title" aria-describedby="decision-body">
       <h2 id="decision-title">{title}</h2>
       <p id="decision-body" className="muted">
-        {moment.kind === 'safetycar'
-          ? 'The field slows and bunches up behind the safety car, so a stop now costs far fewer places than under green flags. Rivals will be deciding too.'
-          : 'A stop fixes the damage and costs the usual time in the pit lane.'}
+        {bodies[moment.kind]}
       </p>
       {cars.map((car) => {
         const position = sim.standings().indexOf(car) + 1;
@@ -51,7 +65,7 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
             </div>
             <div className="row wrap" style={{ gap: 6 }}>
               <span className="muted" style={{ fontSize: 12 }}>Box for</span>
-              {ALL_COMPOUNDS.map((c) => (
+              {PIT_COMPOUNDS.map((c) => (
                 <button
                   key={c}
                   className={`btn small ${car.pitRequest === c ? 'active' : ''}`}
