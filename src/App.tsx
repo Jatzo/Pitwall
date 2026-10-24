@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { trackById } from './data/tracks.ts';
 import { carOverall } from './data/teams.ts';
 import { scoreRace } from './engine/scoring.ts';
@@ -6,6 +6,8 @@ import type { ScoredRow } from './engine/scoring.ts';
 import type { RaceConfig, RaceSim } from './engine/race.ts';
 import type { TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
+import { effectiveTeams } from './state/effectiveTeams.ts';
+import { settleRace } from './state/finance.ts';
 import { isSeasonOver, newCareer, recordRace } from './state/season.ts';
 import type { Career } from './state/season.ts';
 import { Calendar } from './ui/Calendar.tsx';
@@ -130,6 +132,9 @@ export function App() {
     if (saved.status === 'ok') saveCareer(saved.career);
   }, [saved]);
   const [screen, setScreen] = useState<Screen>({ name: 'menu' });
+  // The grid as it races, with the career laid over the editor's teams. It changes only when either does,
+  // so a weekend already under way keeps its qualifying.
+  const racing = useMemo(() => (career ? effectiveTeams(teams, career) : teams), [teams, career]);
 
   const updateTeams = (next: TeamDef[]) => {
     setTeams(next);
@@ -140,7 +145,7 @@ export function App() {
     if (!career) return;
     const config: RaceConfig = {
       track: trackById(setup.trackId),
-      teams,
+      teams: racing,
       grid: setup.grid,
       laps: setup.laps,
       seed: setup.seed,
@@ -154,7 +159,7 @@ export function App() {
   const finishRace = (sim: RaceSim) => {
     if (!career) return;
     const rows = scoreRace(sim.results(), sim.fastestLap?.carId ?? null);
-    const next = recordRace(career, sim.totalLaps, rows, teams);
+    const next = settleRace(recordRace(career, sim.totalLaps, rows, racing)).career;
     setCareer(next);
     saveCareer(next);
     setScreen({ name: 'results', rows, trackId: sim.track.def.id, laps: sim.totalLaps });
@@ -176,7 +181,7 @@ export function App() {
           onNew={(teamId) => {
             clearCareer();
             setSaveProblem(null);
-            const c = newCareer(teamId);
+            const c = newCareer(teamId, teams);
             saveCareer(c);
             setCareer(c);
             setScreen({ name: 'hub' });
@@ -188,7 +193,7 @@ export function App() {
       break;
     case 'hub':
       body = career ? (
-        <WeekendHub career={career} teams={teams} onStart={startRace} onCalendar={() => setScreen({ name: 'calendar', back: 'hub' })} />
+        <WeekendHub career={career} teams={racing} onStart={startRace} onCalendar={() => setScreen({ name: 'calendar', back: 'hub' })} />
       ) : null;
       break;
     case 'race':
@@ -198,7 +203,7 @@ export function App() {
       body = career ? (
         <ResultsScreen
           career={career}
-          teams={teams}
+          teams={racing}
           rows={screen.rows}
           trackId={screen.trackId}
           laps={screen.laps}
@@ -210,7 +215,7 @@ export function App() {
       body = career ? (
         <div className="page stack">
           <h2 className="page-title">Season complete</h2>
-          <Standings results={career.results} teams={teams} playerTeamId={career.playerTeamId} />
+          <Standings results={career.results} teams={racing} playerTeamId={career.playerTeamId} />
           <div className="row">
             <button className="btn primary" onClick={() => setScreen({ name: 'menu' })}>Back to menu</button>
             <button className="btn" onClick={() => setScreen({ name: 'calendar', back: 'season' })}>Season calendar</button>
@@ -220,7 +225,7 @@ export function App() {
       break;
     case 'calendar': {
       const back = screen.back;
-      body = career ? <Calendar career={career} teams={teams} onBack={() => setScreen(back === 'hub' ? { name: 'hub' } : { name: 'season' })} /> : null;
+      body = career ? <Calendar career={career} teams={racing} onBack={() => setScreen(back === 'hub' ? { name: 'hub' } : { name: 'season' })} /> : null;
       break;
     }
     case 'teams':

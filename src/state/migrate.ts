@@ -5,6 +5,7 @@
  */
 
 import type { TeamDef } from '../engine/types.ts';
+import { startingMoney } from './finance.ts';
 import { driverIdFor } from './season.ts';
 import type { Career, RaceRecord, RaceRecordRow } from './season.ts';
 
@@ -46,6 +47,20 @@ function readCommon(raw: Raw, teams: readonly TeamDef[], needDriver: boolean): {
 }
 
 /** Version 1 (milestones 1 to 4): one season, rows keyed by car seat only. */
+/**
+ * Sections added to version 2 after its first saves were written are filled
+ * in with a new team's defaults, so those saves keep loading without a new
+ * version. A section that is present but damaged makes the save unreadable.
+ */
+function withSections(raw: Raw, teams: readonly TeamDef[]): Raw | null {
+  const fresh = startingMoney(teams, raw.playerTeamId as string);
+  const finance = raw.finance ?? fresh.finance;
+  if (!isObject(finance) || typeof finance.balance !== 'number' || !Array.isArray(finance.ledger)) return null;
+  const drivers = raw.drivers ?? fresh.drivers;
+  if (!Array.isArray(drivers) || drivers.length !== 2 || !drivers.every((d) => isObject(d) && typeof d.driverId === 'string' && typeof d.salary === 'number' && isInt(d.seasonsLeft, 0)) || drivers[0].driverId === drivers[1].driverId) return null;
+  return { ...raw, finance, drivers };
+}
+
 function fromVersion1(raw: Raw, teams: readonly TeamDef[]): SaveResult {
   const common = readCommon(raw, teams, false);
   if ('reason' in common) return { status: 'unreadable', reason: common.reason };
@@ -54,25 +69,16 @@ function fromVersion1(raw: Raw, teams: readonly TeamDef[]): SaveResult {
     ...(race as unknown as RaceRecord),
     rows: (race.rows as Raw[]).map((r) => ({ ...(r as unknown as RaceRecordRow), driverId: driverIdFor(teams, r.carId as string) })),
   }));
-  return {
-    status: 'ok',
-    career: {
-      version: 2,
-      seed: raw.seed as number,
-      playerTeamId: raw.playerTeamId as string,
-      calendar: raw.calendar as string[],
-      results,
-      season: 1,
-      roundsBefore: 0,
-    },
-  };
+  const career = withSections({ version: 2, seed: raw.seed, playerTeamId: raw.playerTeamId, calendar: raw.calendar, results, season: 1, roundsBefore: 0 }, teams);
+  return career ? { status: 'ok', career: career as unknown as Career } : { status: 'unreadable', reason: 'the data is damaged' };
 }
 
 function fromVersion2(raw: Raw, teams: readonly TeamDef[]): SaveResult {
   const common = readCommon(raw, teams, true);
   if ('reason' in common) return { status: 'unreadable', reason: common.reason };
   if (!isInt(raw.season, 1) || !isInt(raw.roundsBefore, 0)) return { status: 'unreadable', reason: 'the data is damaged' };
-  return { status: 'ok', career: raw as unknown as Career };
+  const career = withSections(raw, teams);
+  return career ? { status: 'ok', career: career as unknown as Career } : { status: 'unreadable', reason: 'the data is damaged' };
 }
 
 function parseOne(text: string, teams: readonly TeamDef[]): SaveResult {

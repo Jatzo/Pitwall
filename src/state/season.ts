@@ -6,6 +6,7 @@
 import { SEASON_CALENDAR } from '../data/tracks.ts';
 import type { ScoredRow } from '../engine/scoring.ts';
 import type { TeamDef } from '../engine/types.ts';
+import { startingMoney } from './finance.ts';
 
 export interface RaceRecordRow {
   /** The car: team id and seat, as `team:0` or `team:1`. Team points follow the car. */
@@ -27,6 +28,21 @@ export interface RaceRecord {
   rows: RaceRecordRow[];
 }
 
+/** One line of the team's accounts, in millions of pounds; income positive, costs negative. */
+export interface LedgerEntry {
+  season: number;
+  round: number;
+  label: string;
+  amount: number;
+}
+
+/** A player driver's deal: salary per race in millions of pounds, and seasons left to run. */
+export interface DriverContract {
+  driverId: string;
+  salary: number;
+  seasonsLeft: number;
+}
+
 export interface Career {
   version: 2;
   seed: number;
@@ -39,12 +55,16 @@ export interface Career {
   season: number;
   /** Rounds raced in earlier seasons, so every round of a career has its own seed. */
   roundsBefore: number;
+  /** Money in millions of pounds, and the newest ledger lines first. */
+  finance: { balance: number; ledger: LedgerEntry[] };
+  /** The player team's two drivers, in seat order. */
+  drivers: [DriverContract, DriverContract];
 }
 
 export const CALENDAR: readonly string[] = SEASON_CALENDAR;
 
-export function newCareer(playerTeamId: string, seed = Math.floor(Math.random() * 2 ** 31)): Career {
-  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0 };
+export function newCareer(playerTeamId: string, teams: readonly TeamDef[], seed = Math.floor(Math.random() * 2 ** 31)): Career {
+  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId) };
 }
 
 /** Index of the next race to run (equals the number of races completed). */

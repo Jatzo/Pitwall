@@ -27,6 +27,7 @@
 - **Fixed timestep, variable rendering.** The UI accumulates real time, steps the sim in 0.1 s increments, and interpolates marker positions between steps (`prevDist` to `dist`) so motion is smooth at 1x.
 - **Per-car RNG streams** (`mixSeed(seed, label)`), so adding a car or an event does not reshuffle every other random draw.
 - **Saves carry a version.** `src/state/migrate.ts` reads every version the game has written: a milestone 4 save is moved up once and kept as a backup, and a save that is damaged, made by a newer version, or for a team not on the grid is reported on the menu instead of being replaced. Each race row records the driver as well as the car, so driver points follow the driver and team points follow the car. Race seeds count rounds across the whole career, so a second season does not replay the first.
+- **Money is booked after each race.** `src/state/finance.ts` holds every amount in one table. A race pays a start fee and prize money by points, and costs salaries, running costs and a repair for each car retired in a collision. The balance can go below zero; the debt carries over. `src/state/effectiveTeams.ts` lays the career over the editor's teams, so the editor's changes always come first and the engine still receives a plain `TeamDef[]`.
 
 ## Model decisions
 
