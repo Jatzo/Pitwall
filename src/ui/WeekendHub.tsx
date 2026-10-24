@@ -10,6 +10,7 @@ import { PIT_COMPOUNDS, bestClass } from '../engine/tyres.ts';
 import { RAIN_THRESHOLD, forecast, generateWeather, rainAt } from '../engine/weather.ts';
 import type { WeatherTimeline } from '../engine/weather.ts';
 import type { StrategyPlan, TeamDef } from '../engine/types.ts';
+import { AREAS } from '../state/development.ts';
 import { currentRound, raceSeed } from '../state/season.ts';
 import type { Career } from '../state/season.ts';
 import { PlanEditor } from './PlanEditor.tsx';
@@ -17,6 +18,7 @@ import { Standings } from './Standings.tsx';
 import { TeamLogo } from './TeamLogo.tsx';
 import { TrackOutline } from './TrackOutline.tsx';
 import { cssVar } from './colour.ts';
+import { formatMoney } from './money.ts';
 
 export interface RaceSetup {
   trackId: string;
@@ -32,6 +34,7 @@ interface Props {
   teams: TeamDef[];
   onStart: (setup: RaceSetup) => void;
   onCalendar: () => void;
+  onHQ: () => void;
 }
 
 const LENGTHS = [
@@ -41,7 +44,7 @@ const LENGTHS = [
   { pct: 1, label: 'Full distance' },
 ];
 
-export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
+export function WeekendHub({ career, teams, onStart, onCalendar, onHQ }: Props) {
   const round = currentRound(career);
   const trackDef = trackById(career.calendar[round]);
   const fullLaps = fullRaceLaps(trackDef);
@@ -66,10 +69,12 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
     return RaceSim.suggestPlan(trackDef, playerTeam, playerTeam.drivers[i], laps, null);
   };
 
-  // Reset the weekend whenever the round, race length or edited teams change.
+  // Reset the weekend when the round or the grid itself changes: an edited team, a signed driver or an
+  // upgrade that arrived. Spending money in Team HQ changes the career but not the grid, so it keeps qualifying.
+  const gridKey = teams.map((t) => `${t.id}:${t.drivers.map((d) => d.id).join('+')}:${AREAS.map((a) => t.car[a]).join(',')}`).join('|');
   useEffect(() => {
     setQuali(null);
-  }, [round, teams]);
+  }, [round, gridKey]);
   useEffect(() => {
     setPlans({ [`${playerTeam.id}:0`]: suggest(0), [`${playerTeam.id}:1`]: suggest(1) });
   }, [round, laps, playerTeam.id, wetStart]);
@@ -95,12 +100,19 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
           <div className="muted">{trackDef.location}</div>
         </div>
         <button className="btn" onClick={onCalendar}>Season calendar</button>
+        <button className="btn" onClick={onHQ}>
+          Team HQ <span className={`num ${career.finance.balance < 0 ? 'bad' : 'muted'}`}>{formatMoney(career.finance.balance)}</span>
+        </button>
         <TeamLogo team={playerTeam} size={44} />
         <div>
           <b>{playerTeam.name}</b>
           <div className="muted small">Team principal</div>
         </div>
       </div>
+
+      {career.sponsor?.season !== career.season && (
+        <div className="warnbox">No sponsor is signed for this season. Team HQ has three offers.</div>
+      )}
 
       <div className="grid2" style={{ alignItems: 'start' }}>
         <div className="stack">

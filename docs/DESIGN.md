@@ -26,6 +26,12 @@
 - **The engine never imports React or touches the browser.** That is what makes it testable in Node, runnable headless for balancing, and replayable: a race is fully determined by its config and seed, and player input is a log of `RaceCommand`s.
 - **Fixed timestep, variable rendering.** The UI accumulates real time, steps the sim in 0.1 s increments, and interpolates marker positions between steps (`prevDist` to `dist`) so motion is smooth at 1x.
 - **Per-car RNG streams** (`mixSeed(seed, label)`), so adding a car or an event does not reshuffle every other random draw.
+- **Saves carry a version.** `src/state/migrate.ts` reads every version the game has written: a milestone 4 save is moved up once and kept as a backup, and a save that is damaged, made by a newer version, or for a team not on the grid is reported on the menu instead of being replaced. Each race row records the driver as well as the car, so driver points follow the driver and team points follow the car. Race seeds count rounds across the whole career, so a second season does not replay the first.
+- **Money is booked after each race.** `src/state/finance.ts` holds every amount in one table. A race pays a start fee and prize money by points, and costs salaries, running costs and a repair for each car retired in a collision. The balance can go below zero; the debt carries over. `src/state/effectiveTeams.ts` lays the career over the editor's teams, so the editor's changes always come first and the engine still receives a plain `TeamDef[]`.
+- **Car development.** `src/state/development.ts` sells projects in five areas: a quick fix (one round, one point, always works), an upgrade (two rounds, two points) or a major package (three rounds, four points). The bigger ones cost less per point, but a bad result gives half. A point costs more the closer a rating is to 99, with the fourth power of the distance, so a point at 84 costs about half what one at 92 does. Rivals spend a budget each round on their weakest area. The budget is drawn from the career seed and scaled by what the rival's own level costs, so every rival gains about the same points and the field keeps its order. At each season start every gain loses a quarter.
+- **Sponsors.** `src/state/sponsors.ts` offers three deals a season from the seed: safe (high base, score points or both cars finish), balanced (a car in the top N, set by where the car ranks) and ambitious (low base, beat the team one place up, or win for the strongest car). The base is paid every race and the bonus when the objective is met. A deal runs one season.
+- **Contracts and seasons.** `src/state/contracts.ts` ends a season: money, the car and contracts carry over, every gain loses a quarter, the sponsor's deal ends and the calendar starts again. A driver whose contract ends asks from 85% of their base salary with no points to 120% for the season's top scorer, or the player signs a free agent from `src/data/drivers.ts`. A signed free agent takes another race number if the editor has given theirs away, and the editor shows that seat but does not edit it.
+- **Balance.** `npm run season` plays three seasons headless for four teams, with a policy that buys the most lap time per pound against one that never spends. Over three seeds: the safe objective was met in 79 to 93% of races, the balanced in 39 to 80% and the ambitious in 14 to 68%. With a midfield team as the player, the gap between the fastest and slowest car held at 24 points over the three seasons; the strongest team spending everything opened it by about 3. A team that spends finishes about a place higher than one that does not from its second season, and one that never spends drifts back about a place.
 
 ## Model decisions
 
@@ -125,6 +131,8 @@ Cars are arrows in team colours with a dark outline, so they stand out against g
 
 Beside race control, a camera shows a close-up chosen by a director in `src/ui/director.ts`. In order, it shows a car the player has chosen to follow, the story on screen, a fight involving the player's car, the closest fight in the top five, and otherwise the leader. It holds each of its own choices for six seconds, so the picture does not hunt. Up to 4x the camera follows a 450 m window, and at 8x a 900 m one. At 16x and 32x a car crosses several windows a second, so the camera holds a fixed shot of the third of the lap the car is in and cuts when it moves on. When the player has asked for reduced motion the camera never pans: the close-up holds still with the car at the back of the frame, and cuts as the car leaves. The camera reuses the map's ground layer and moves it with a CSS transform. It costs about 4 ms a frame: about 75 frames a second against 89 without it, in headless Chrome at 32x.
 
+The player's two drivers talk on the team radio (`src/ui/radio.ts`). They react to a place gained or lost, tyres at the cliff, the car ahead pitting and the last lap, and they answer when the player asks for a stop. Each trigger has three or four lines, picked from the race seed so a replay says the same thing, and a driver stays quiet about the same thing for four laps. A line waits up to six seconds behind the story it answers and sits below the factual stories about the same car, so it never pushes one off the strip. Over six 20-lap races the two drivers say about seven lines a race, and three in four reach the strip at 8x to 32x.
+
 ## Testing
 
 `node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), and season standings.
@@ -132,7 +140,7 @@ Beside race control, a camera shows a close-up chosen by a director in `src/ui/d
 ## Known limits
 
 - A race in progress is not saved; only completed rounds are.
-- Car development does not exist yet.
+- A midfield team that spends ends about one place higher than one that does not, where the economy aimed for two places up.
 - Qualifying is always dry; rain arrives only in the race.
 - Rival teams sometimes fit intermediates and then full wets a few laps later in a strengthening shower, because they only see the rain already falling.
 - Circuits are drawn to the design rules of real circuits (corner counts, radii, straight lengths: see [research/circuit-design.md](research/circuit-design.md)) but are not copies of real layouts, by design.
@@ -140,8 +148,6 @@ Beside race control, a camera shows a close-up chosen by a director in `src/ui/d
 
 ## Roadmap
 
-1. Budget, R&D and car upgrades between rounds.
-2. Driver contracts, development and a transfer market.
-3. Sponsors and objectives.
-4. Replay from the command log, plus lap-time and tyre-wear charts.
-5. Wet qualifying.
+1. Drivers who develop, and a transfer market in which rival teams sign drivers too.
+2. Replay from the command log, plus lap-time and tyre-wear charts.
+3. Wet qualifying.

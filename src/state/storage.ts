@@ -6,10 +6,14 @@
 
 import { defaultTeams } from '../data/teams.ts';
 import type { LogoSpec, TeamDef } from '../engine/types.ts';
+import { parseSave } from './migrate.ts';
+import type { SaveResult } from './migrate.ts';
 import type { Career } from './season.ts';
 
 const TEAMS_KEY = 'pitwall.teams.v1';
-const CAREER_KEY = 'pitwall.career.v1';
+const CAREER_KEY = 'pitwall.career.v2';
+/** Where milestones 1 to 4 kept the season. Read once to move it up; left in place as a backup. */
+const OLD_CAREER_KEY = 'pitwall.career.v1';
 
 interface DriverCustomisation {
   name: string;
@@ -27,9 +31,17 @@ export interface TeamCustomisation {
 
 export type CustomisationMap = Record<string, TeamCustomisation>;
 
-function read<T>(key: string): T | null {
+function readText(key: string): string | null {
   try {
-    const raw = window.localStorage.getItem(key);
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function read<T>(key: string): T | null {
+  const raw = readText(key);
+  try {
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
@@ -100,12 +112,9 @@ export function resetTeams(): TeamDef[] {
   return defaultTeams();
 }
 
-export function loadCareer(): Career | null {
-  const c = read<Career>(CAREER_KEY);
-  if (!c || c.version !== 1 || typeof c.seed !== 'number' || !Array.isArray(c.results) || !c.playerTeamId) {
-    return null;
-  }
-  return c;
+/** The saved career, or why it cannot be read, so the game can ask before replacing it. */
+export function loadCareer(teams: readonly TeamDef[]): SaveResult {
+  return parseSave(readText(CAREER_KEY), readText(OLD_CAREER_KEY), teams);
 }
 
 export function saveCareer(career: Career): void {
@@ -115,6 +124,7 @@ export function saveCareer(career: Career): void {
 export function clearCareer(): void {
   try {
     window.localStorage.removeItem(CAREER_KEY);
+    window.localStorage.removeItem(OLD_CAREER_KEY);
   } catch {
     // ignore
   }

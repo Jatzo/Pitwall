@@ -10,6 +10,7 @@ import type { Direction } from './director.ts';
 import { weatherWord } from './Conditions.tsx';
 import { EventFeed } from './EventFeed.tsx';
 import { nextMoment, watchMoments } from './moments.ts';
+import { boxCall, radioFor, watchRadio } from './radio.ts';
 import type { Moment } from './moments.ts';
 import { StoryBanner } from './StoryBanner.tsx';
 import type { RaceGlance } from './StoryBanner.tsx';
@@ -81,6 +82,7 @@ export function RaceScreen({ config, onFinish }: Props) {
   const storiesOnRef = useRef(storiesOn);
   const storyWatchRef = useRef(watchStories(sim));
   const storyQueueRef = useRef(new StoryQueue());
+  const radioRef = useRef(watchRadio(config.seed));
   // Real seconds of play: it stops while paused or while a decision is open, so stories never expire unseen.
   const storyClockRef = useRef(0);
   const storyRef = useRef<Story | null>(null);
@@ -110,7 +112,8 @@ export function RaceScreen({ config, onFinish }: Props) {
           accRef.current -= STEP;
           n++;
           const stories = nextStories(sim, storyWatchRef.current);
-          if (storiesOnRef.current) storyQueueRef.current.push(stories, storyClockRef.current);
+          const radio = radioFor(sim, radioRef.current, stories);
+          if (storiesOnRef.current) storyQueueRef.current.push([...stories, ...radio], storyClockRef.current);
           // Stop on the exact step a key moment happens, rather than at the end of this frame's batch.
           const found = nextMoment(sim, watchRef.current);
           if (found && pauseRef.current) {
@@ -139,6 +142,11 @@ export function RaceScreen({ config, onFinish }: Props) {
   const dispatch = useCallback(
     (cmd: RaceCommand) => {
       sim.command(cmd);
+      // The driver answers a stop the player asks for; the acknowledgement comes from the request, not from car state.
+      if (cmd.type === 'pit' && cmd.compound) {
+        const ack = boxCall(sim, radioRef.current, cmd.carId, cmd.compound);
+        if (ack && storiesOnRef.current) storyQueueRef.current.push([ack], storyClockRef.current);
+      }
       setTick((t) => t + 1);
     },
     [sim],

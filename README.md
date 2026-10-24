@@ -19,7 +19,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Deterministic design:** a separate seeded random stream for each purpose.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 262 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 327 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -29,7 +29,8 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Pit wall** for your two cars: pace and engine modes, pit-now with compound choice and a projected rejoin position, an editable stop plan with tyre-wear forecasts and warnings, tyre-life and fuel-margin estimates, and an optional AI race engineer.
 - **Key moments pause the race**: when the safety car comes out, one of your cars is damaged, rain starts, or the conditions turn in favour of another tyre, the game stops and asks for your pit call (this can be turned off).
 - **Weather**: rain that comes and goes, a racing line that dries before the rest of the track, intermediate and full wet tyres, and a forecast with honest uncertainty, by quarter of the race before the start and in 5-minute steps during it. Rivals react to the rain they can see; the forecast is your edge.
-- **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, and a drivers' and constructors' championship over a ten-round season. Progress is saved in the browser; a season started before the calendar grew keeps its original four rounds.
+- **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, and a drivers' and constructors' championship over ten-round seasons, one after another. Progress is saved in the browser; a season started before the calendar grew keeps its original four rounds.
+- **Team HQ** between races: a budget with each round's money itemised, car projects in five areas that take one to three rounds and can come in at half, and a sponsor to sign each season, whose objective pays a bonus in every race it is met. Rival teams develop their cars each round too. When a driver's contract ends, re-sign them at a salary that follows their points or sign one of eight fictional free agents.
 - **Ten fictional circuits**, each with its own problem: a fast power circuit, two street circuits where passing is hard, a tyre-eater, a 79-lap short track and more. A calendar screen shows each round's character and how your finished rounds went.
 
 ![The ten circuits](docs/circuits.svg)
@@ -64,6 +65,7 @@ npm run sim -- --track silverwood --seed 3   # run a whole race headless and pri
 npm run calibrate -- --seeds 30               # 300 races, averages for the calibration table in docs/DESIGN.md
 npm run calibrate -- --seeds 30 --weather     # the same, with each circuit's chance of rain as in the game
 npm run circuits                              # circuit numbers, and redraw docs/circuits.svg
+npm run season -- --seasons 3 --seeds 3     # whole careers headless, spending against not spending, for the economy
 ```
 
 Pushing to `main` runs tests and the build, then deploys `dist/` to GitHub Pages (enable Pages with the "GitHub Actions" source in the repository settings).
