@@ -23,6 +23,7 @@ import { TeamLogo } from './ui/TeamLogo.tsx';
 import { WeekendHub } from './ui/WeekendHub.tsx';
 import type { RaceSetup } from './ui/WeekendHub.tsx';
 import { cssVar } from './ui/colour.ts';
+import jatzoMark from './assets/jatzo-mark.png';
 
 type Screen =
   | { name: 'menu' }
@@ -123,6 +124,12 @@ function Menu({
           Start new season
         </button>
       </div>
+      <footer className="made-by">
+        <a href="https://jatzo.co.uk" target="_blank" rel="noopener noreferrer">
+          Made by <img src={jatzoMark} alt="" width={20} height={20} /> Jatzo
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </footer>
     </div>
   );
 }

@@ -282,6 +282,10 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .hero { padding: 28px 0 6px; }
 .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 .hero p { color: var(--muted); max-width: 640px; margin: 8px 0 0; }
+.made-by { padding: 8px 0 4px; font-size: 12px; }
+.made-by a { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); text-decoration: none; }
+.made-by a:hover { color: var(--text); }
+.made-by a:hover, .made-by a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .trackinfo { display: flex; gap: 18px; flex-wrap: wrap; }
 .trackinfo div { display: flex; flex-direction: column; }
 .trackinfo b { font-family: var(--mono); font-size: 16px; }
