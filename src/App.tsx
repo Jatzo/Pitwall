@@ -9,13 +9,14 @@ import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams }
 import { deliverProjects, startProject } from './state/development.ts';
 import { effectiveTeams } from './state/effectiveTeams.ts';
 import { settleRace } from './state/finance.ts';
+import { startNextSeason } from './state/contracts.ts';
 import { chooseSponsor } from './state/sponsors.ts';
 import { isSeasonOver, newCareer, recordRace } from './state/season.ts';
 import type { Career } from './state/season.ts';
 import { Calendar } from './ui/Calendar.tsx';
 import { RaceScreen } from './ui/RaceScreen.tsx';
 import { ResultsScreen } from './ui/ResultsScreen.tsx';
-import { Standings } from './ui/Standings.tsx';
+import { SeasonEnd } from './ui/SeasonEnd.tsx';
 import { TeamEditor } from './ui/TeamEditor.tsx';
 import { TeamHQ } from './ui/TeamHQ.tsx';
 import { TeamLogo } from './ui/TeamLogo.tsx';
@@ -139,6 +140,15 @@ export function App() {
   // The grid as it races, with the career laid over the editor's teams. It changes only when either does,
   // so a weekend already under way keeps its qualifying.
   const racing = useMemo(() => (career ? effectiveTeams(teams, career) : teams), [teams, career]);
+  // Seats in the player's team that a signed free agent holds, which the editor shows but does not edit.
+  const heldBy: Record<string, string> = {};
+  if (career) {
+    const mine = racing.find((t) => t.id === career.playerTeamId);
+    const own = teams.find((t) => t.id === career.playerTeamId);
+    mine?.drivers.forEach((d, seat) => {
+      if (own && d.id !== own.drivers[seat].id) heldBy[`${career.playerTeamId}:${seat}`] = d.name;
+    });
+  }
 
   const updateTeams = (next: TeamDef[]) => {
     setTeams(next);
@@ -227,14 +237,16 @@ export function App() {
       break;
     case 'season':
       body = career ? (
-        <div className="page stack">
-          <h2 className="page-title">Season complete</h2>
-          <Standings results={career.results} teams={racing} playerTeamId={career.playerTeamId} />
-          <div className="row">
-            <button className="btn primary" onClick={() => setScreen({ name: 'menu' })}>Back to menu</button>
-            <button className="btn" onClick={() => setScreen({ name: 'calendar', back: 'season' })}>Season calendar</button>
-          </div>
-        </div>
+        <SeasonEnd
+          career={career}
+          teams={racing}
+          onStart={(decisions) => {
+            commit(startNextSeason(career, racing, decisions));
+            setScreen({ name: 'hub' });
+          }}
+          onCalendar={() => setScreen({ name: 'calendar', back: 'season' })}
+          onMenu={() => setScreen({ name: 'menu' })}
+        />
       ) : null;
       break;
     case 'calendar': {
@@ -258,6 +270,7 @@ export function App() {
       body = (
         <TeamEditor
           teams={teams}
+          heldBy={heldBy}
           onChange={updateTeams}
           onReset={() => {
             if (window.confirm('Reset every team, driver, colour and logo to the defaults?')) setTeams(resetTeams());

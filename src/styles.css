@@ -270,6 +270,14 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .hq-round .hq-h4 { margin-top: 10px; }
 .hq-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
 
+/* ----- season end ----- */
+.season-seat { border: 0; margin: 0; padding: 10px 0; min-width: 0; }
+.season-seat + .season-seat { border-top: 1px solid var(--line); }
+.season-seat legend { float: left; width: 100%; padding: 0; margin-bottom: 6px; }
+.season-seat legend + * { clear: both; }
+.season-choice { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; cursor: pointer; }
+.season-choice input { accent-color: var(--accent); }
+
 /* ----- misc ----- */
 .hero { padding: 28px 0 6px; }
 .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }

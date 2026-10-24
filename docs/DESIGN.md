@@ -30,6 +30,7 @@
 - **Money is booked after each race.** `src/state/finance.ts` holds every amount in one table. A race pays a start fee and prize money by points, and costs salaries, running costs and a repair for each car retired in a collision. The balance can go below zero; the debt carries over. `src/state/effectiveTeams.ts` lays the career over the editor's teams, so the editor's changes always come first and the engine still receives a plain `TeamDef[]`.
 - **Car development.** `src/state/development.ts` sells projects in five areas: a quick fix (one round, one point, always works), an upgrade (two rounds, two points) or a major package (three rounds, four points). The bigger ones cost less per point, but a bad result gives half. A point costs more the closer a rating is to 99, with the fourth power of the distance, so a point at 84 costs about half what one at 92 does. Rivals spend a budget each round on their weakest area. The budget is drawn from the career seed and scaled by what the rival's own level costs, so every rival gains about the same points and the field keeps its order. At each season start every gain loses a quarter.
 - **Sponsors.** `src/state/sponsors.ts` offers three deals a season from the seed: safe (high base, score points or both cars finish), balanced (a car in the top N, set by where the car ranks) and ambitious (low base, beat the team one place up, or win for the strongest car). The base is paid every race and the bonus when the objective is met. A deal runs one season.
+- **Contracts and seasons.** `src/state/contracts.ts` ends a season: money, the car and contracts carry over, every gain loses a quarter, the sponsor's deal ends and the calendar starts again. A driver whose contract ends asks from 85% of their base salary with no points to 120% for the season's top scorer, or the player signs a free agent from `src/data/drivers.ts`. A signed free agent takes another race number if the editor has given theirs away, and the editor shows that seat but does not edit it.
 - **Balance.** `npm run season` plays three seasons headless for four teams, with a policy that buys the most lap time per pound against one that never spends. Over three seeds: the safe objective was met in 79 to 93% of races, the balanced in 39 to 80% and the ambitious in 14 to 68%. With a midfield team as the player, the gap between the fastest and slowest car held at 24 points over the three seasons; the strongest team spending everything opened it by about 3. A team that spends finishes about a place higher than one that does not from its second season, and one that never spends drifts back about a place.
 
 ## Model decisions
@@ -147,6 +148,6 @@ The player's two drivers talk on the team radio (`src/ui/radio.ts`). They react 
 
 ## Roadmap
 
-1. Driver contracts, development and a transfer market.
+1. Drivers who develop, and a transfer market in which rival teams sign drivers too.
 2. Replay from the command log, plus lap-time and tyre-wear charts.
 3. Wet qualifying.

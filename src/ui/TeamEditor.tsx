@@ -7,6 +7,8 @@ interface Props {
   onChange: (teams: TeamDef[]) => void;
   onReset: () => void;
   onClose: () => void;
+  /** Seats the career has given to a signed free agent, by `team:seat`, with that driver's name. */
+  heldBy?: Record<string, string>;
 }
 
 const MAX_LOGO_PX = 128;
@@ -43,9 +45,10 @@ function readLogo(file: File): Promise<string> {
   });
 }
 
-export function TeamEditor({ teams, onChange, onReset, onClose }: Props) {
+export function TeamEditor({ teams, onChange, onReset, onClose, heldBy = {} }: Props) {
   const [id, setId] = useState(teams[0].id);
   const [error, setError] = useState<string | null>(null);
+  const [numberError, setNumberError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const team = teams.find((t) => t.id === id) ?? teams[0];
 
@@ -163,6 +166,16 @@ export function TeamEditor({ teams, onChange, onReset, onClose }: Props) {
             <h3>Drivers</h3>
             {([0, 1] as const).map((i) => {
               const d = team.drivers[i];
+              const held = heldBy[`${team.id}:${i}`];
+              if (held) {
+                return (
+                  <div key={d.id} className="muted small" style={{ marginBottom: 8 }}>
+                    Seat {i + 1}: <b className="strong">{held}</b>, signed in your season, races here instead of {d.name}. Their details come
+                    from the contract, so this seat cannot be edited while it runs.
+                  </div>
+                );
+              }
+              const owner = (n: number) => teams.flatMap((t) => t.drivers).find((x) => x.id !== d.id && x.number === n);
               return (
                 <div className="row wrap" key={d.id} style={{ marginBottom: 8 }}>
                   <label className="field" style={{ flex: 1, minWidth: 180 }}>
@@ -173,24 +186,60 @@ export function TeamEditor({ teams, onChange, onReset, onClose }: Props) {
                     Code
                     <input type="text" maxLength={3} style={{ width: 70 }} value={d.code} onChange={(e) => setDriver(i, { code: e.target.value.toUpperCase() })} />
                   </label>
-                  <label className="field">
-                    Number
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      style={{ width: 70 }}
-                      value={d.number}
-                      onChange={(e) => setDriver(i, { number: Math.max(1, Math.min(99, Math.round(Number(e.target.value) || 1))) })}
-                    />
-                  </label>
+                  <NumberField
+                    value={d.number}
+                    takenBy={(n) => owner(n)?.name ?? null}
+                    onChange={(n) => setDriver(i, { number: n })}
+                    onProblem={setNumberError}
+                  />
                 </div>
               );
             })}
+            {numberError && <div className="warnbox" style={{ marginBottom: 8 }} role="alert">{numberError}</div>}
             <div className="muted small">Ratings stay fixed so every team keeps the same competitive balance. Names are cosmetic.</div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A race number box that saves only a number nobody else has. What is typed
+ * stays in the box meanwhile, so a number whose first digit is taken can
+ * still be entered; leaving the box puts the saved number back.
+ */
+function NumberField({ value, takenBy, onChange, onProblem }: {
+  value: number;
+  takenBy: (n: number) => string | null;
+  onChange: (n: number) => void;
+  onProblem: (message: string | null) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const type = (text: string) => {
+    setDraft(text);
+    const n = Number(text);
+    if (!Number.isInteger(n) || n < 1 || n > 99) return onProblem('A race number runs from 1 to 99.');
+    const owner = takenBy(n);
+    if (owner) return onProblem(`Number ${n} already belongs to ${owner}.`);
+    onProblem(null);
+    onChange(n);
+  };
+  return (
+    <label className="field">
+      Number
+      <input
+        type="number"
+        min={1}
+        max={99}
+        style={{ width: 70 }}
+        value={draft ?? value}
+        onChange={(e) => type(e.target.value)}
+        onBlur={() => {
+          setDraft(null);
+          onProblem(null);
+        }}
+      />
+    </label>
   );
 }
