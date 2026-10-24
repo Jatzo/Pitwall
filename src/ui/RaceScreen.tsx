@@ -8,24 +8,29 @@ import { weatherWord } from './Conditions.tsx';
 import { EventFeed } from './EventFeed.tsx';
 import { nextMoment, watchMoments } from './moments.ts';
 import type { Moment } from './moments.ts';
+import { StoryBanner } from './StoryBanner.tsx';
+import { StoryQueue, holdFor, nextStories, watchStories } from './stories.ts';
+import type { Story } from './stories.ts';
 import { TimingTower } from './TimingTower.tsx';
 import { TrackMap } from './TrackMap.tsx';
 
 const STEP = 0.1; // simulation timestep in seconds
 const SPEEDS = [1, 2, 4, 8, 16, 32];
 const PAUSE_KEY = 'pitwall.pauseForMoments';
+const STORIES_KEY = 'pitwall.stories';
 
-function loadPausePreference(): boolean {
+/** A race-screen switch remembered between races; on unless turned off. */
+function loadFlag(key: string): boolean {
   try {
-    return window.localStorage.getItem(PAUSE_KEY) !== 'false';
+    return window.localStorage.getItem(key) !== 'false';
   } catch {
     return true;
   }
 }
 
-function savePausePreference(on: boolean): void {
+function saveFlag(key: string, on: boolean): void {
   try {
-    window.localStorage.setItem(PAUSE_KEY, String(on));
+    window.localStorage.setItem(key, String(on));
   } catch {
     // Storage unavailable: the preference lasts for this race only.
   }
@@ -45,7 +50,8 @@ export function RaceScreen({ config, onFinish }: Props) {
   const [labels, setLabels] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => sim.cars.find((c) => c.isPlayer)?.id ?? null);
   const [moment, setMoment] = useState<Moment | null>(null);
-  const [pauseForMoments, setPauseForMoments] = useState(loadPausePreference);
+  const [pauseForMoments, setPauseForMoments] = useState(() => loadFlag(PAUSE_KEY));
+  const [storiesOn, setStoriesOn] = useState(() => loadFlag(STORIES_KEY));
 
   const playingRef = useRef(playing);
   const speedRef = useRef(speed);
@@ -54,6 +60,13 @@ export function RaceScreen({ config, onFinish }: Props) {
   const watchRef = useRef(watchMoments(sim));
   const alphaRef = useRef(0);
   const accRef = useRef(0);
+  const storiesOnRef = useRef(storiesOn);
+  const storyWatchRef = useRef(watchStories(sim));
+  const storyQueueRef = useRef(new StoryQueue());
+  // Real seconds of play: it stops while paused or while a decision is open, so stories never expire unseen.
+  const storyClockRef = useRef(0);
+  const storyRef = useRef<Story | null>(null);
+  storiesOnRef.current = storiesOn;
   playingRef.current = playing && moment === null;
   speedRef.current = speed;
   pauseRef.current = pauseForMoments;
@@ -68,12 +81,15 @@ export function RaceScreen({ config, onFinish }: Props) {
       const dt = Math.min(0.25, (now - last) / 1000);
       last = now;
       if (playingRef.current && sim.phase === 'racing') {
+        storyClockRef.current += dt;
         accRef.current += dt * speedRef.current;
         let n = 0;
         while (accRef.current >= STEP && n < 600 && sim.phase === 'racing') {
           sim.step(STEP);
           accRef.current -= STEP;
           n++;
+          const stories = nextStories(sim, storyWatchRef.current);
+          if (storiesOnRef.current) storyQueueRef.current.push(stories, storyClockRef.current);
           // Stop on the exact step a key moment happens, rather than at the end of this frame's batch.
           const found = nextMoment(sim, watchRef.current);
           if (found && pauseRef.current) {
@@ -86,6 +102,7 @@ export function RaceScreen({ config, onFinish }: Props) {
         if (n >= 600) accRef.current = 0;
       }
       alphaRef.current = Math.min(1, accRef.current / STEP);
+      storyRef.current = storiesOnRef.current ? storyQueueRef.current.current(storyClockRef.current, holdFor(speedRef.current)) : null;
       setFrame((f) => (f + 1) % 1_000_000);
       if (now - lastTick > 180) {
         lastTick = now;
@@ -117,7 +134,13 @@ export function RaceScreen({ config, onFinish }: Props) {
 
   const togglePause = (on: boolean) => {
     setPauseForMoments(on);
-    savePausePreference(on);
+    saveFlag(PAUSE_KEY, on);
+  };
+
+  const toggleStories = (on: boolean) => {
+    setStoriesOn(on);
+    saveFlag(STORIES_KEY, on);
+    if (!on) storyQueueRef.current = new StoryQueue();
   };
 
   const finishNow = () => {
@@ -129,6 +152,9 @@ export function RaceScreen({ config, onFinish }: Props) {
       guard++;
     }
     watchRef.current = watchMoments(sim);
+    storyWatchRef.current = watchStories(sim);
+    storyQueueRef.current = new StoryQueue();
+    storyRef.current = null;
     setTick((t) => t + 1);
   };
 
@@ -198,6 +224,10 @@ export function RaceScreen({ config, onFinish }: Props) {
           <span className="muted">Pause for key moments</span>
         </label>
         <label className="row" style={{ gap: 6 }}>
+          <input type="checkbox" checked={storiesOn} onChange={(e) => toggleStories(e.target.checked)} />
+          <span className="muted">Stories</span>
+        </label>
+        <label className="row" style={{ gap: 6 }}>
           <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} />
           <span className="muted">All labels</span>
         </label>
@@ -216,9 +246,18 @@ export function RaceScreen({ config, onFinish }: Props) {
 
       <div className="center">
         <div className="panel trackbox">
-          <TrackMap sim={sim} selectedId={selectedId} onSelect={setSelectedId} alpha={alphaRef.current} showAllLabels={labels} frame={frame} />
+          <TrackMap
+            sim={sim}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            alpha={alphaRef.current}
+            showAllLabels={labels}
+            frame={frame}
+            spotlight={storyRef.current?.carIds}
+          />
           {moment && <DecisionPrompt sim={sim} moment={moment} dispatch={dispatch} onResume={resume} />}
         </div>
+        {storiesOn && <StoryBanner story={storyRef.current} onSelect={setSelectedId} />}
         <div className="panel" style={{ maxHeight: 190, overflow: 'auto' }}>
           <h3>Race control</h3>
           <EventFeed sim={sim} tick={tick} />

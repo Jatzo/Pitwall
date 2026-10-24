@@ -11,10 +11,12 @@ interface Props {
   showAllLabels: boolean;
   /** Changes every render tick so the markers update. */
   frame: number;
+  /** Cars the story on screen is about: ringed, and linked when there are two. */
+  spotlight?: readonly string[];
 }
 
 /** Black or white, whichever reads better on a team colour. */
-function inkFor(hex: string): string {
+export function inkFor(hex: string): string {
   const n = Number.parseInt(hex.replace('#', ''), 16);
   if (Number.isNaN(n)) return '#fff';
   const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
@@ -142,6 +144,7 @@ function Marker({
   y,
   r,
   selected,
+  spot,
   label,
   onSelect,
 }: {
@@ -151,6 +154,7 @@ function Marker({
   y: number;
   r: number;
   selected: boolean;
+  spot: boolean;
   label: boolean;
   onSelect: (id: string) => void;
 }) {
@@ -158,6 +162,7 @@ function Marker({
   return (
     <g transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} onClick={() => onSelect(car.id)} style={{ cursor: 'pointer' }}>
       {selected && <circle r={r * 2.1} fill="none" stroke="#fff" strokeWidth={r * 0.28} />}
+      {spot && <circle r={r * 2.7} fill="none" stroke="#e6e9f0" strokeWidth={r * 0.2} strokeDasharray={`${r * 0.7} ${r * 0.5}`} />}
       {car.isPlayer && <circle r={r * 1.45} fill="none" stroke={car.team.colors.secondary} strokeWidth={r * 0.3} />}
       <circle r={r} fill={car.team.colors.primary} stroke={pitting ? '#fff' : '#0b0d12'} strokeWidth={r * 0.28} />
       <text
@@ -190,7 +195,7 @@ function Marker({
   );
 }
 
-export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Props) {
+export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels, spotlight = [] }: Props) {
   const t = sim.track;
   const pad = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY) * 0.08;
   const vb = `${(t.bounds.minX - pad).toFixed(0)} ${(t.bounds.minY - pad).toFixed(0)} ${(t.bounds.maxX - t.bounds.minX + pad * 2).toFixed(0)} ${(t.bounds.maxY - t.bounds.minY + pad * 2).toFixed(0)}`;
@@ -205,6 +210,21 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
     .filter((c) => c.status !== 'out')
     .sort((a, b) => Number(a.isPlayer) - Number(b.isPlayer) || Number(a.id === selectedId) - Number(b.id === selectedId));
 
+  const placed = draw.map((car) => {
+    const dist = interp(car.prevDist, car.dist, sim.phase === 'racing' ? alpha : 1);
+    const lat = interp(car.prevLat, car.lat, sim.phase === 'racing' ? alpha : 1);
+    if (car.status === 'pitLane' && car.pit) {
+      // On the pit lane: drawn travelling to the team's own garage, not on the racing line.
+      const slot = garages.indexOf(car.team.id);
+      const p = t.pitLanePoint(t.pitDisplayU(dist - car.pit.boxDist, t.garageU(slot, garages.length)));
+      return { car, x: p.x, y: p.y };
+    }
+    const p = t.pointAt(dist);
+    return { car, x: p.x + Math.sin(p.heading) * lat * (size * 0.0012), y: p.y - Math.cos(p.heading) * lat * (size * 0.0012) };
+  });
+  const ends = spotlight.length === 2 ? spotlight.map((id) => placed.find((p) => p.car.id === id)) : [];
+  const link = ends[0] && ends[1] ? ([ends[0], ends[1]] as const) : null;
+
   const scDist = sim.safetyCarDist();
   const sc = scDist !== null ? t.pointAt(scDist) : null;
 
@@ -214,27 +234,23 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels }: Pr
       {sim.rain > 0 && (
         <rect x={t.bounds.minX - pad} y={t.bounds.minY - pad} width={t.bounds.maxX - t.bounds.minX + pad * 2} height={t.bounds.maxY - t.bounds.minY + pad * 2} fill="#3b8bff" opacity={0.05 + 0.12 * sim.rain} pointerEvents="none" />
       )}
-      {draw.map((car) => {
-        const dist = interp(car.prevDist, car.dist, sim.phase === 'racing' ? alpha : 1);
-        const lat = interp(car.prevLat, car.lat, sim.phase === 'racing' ? alpha : 1);
-        let x: number;
-        let y: number;
-        if (car.status === 'pitLane' && car.pit) {
-          // On the pit lane: drawn travelling to the team's own garage, not on the racing line.
-          const slot = garages.indexOf(car.team.id);
-          const p = t.pitLanePoint(t.pitDisplayU(dist - car.pit.boxDist, t.garageU(slot, garages.length)));
-          x = p.x;
-          y = p.y;
-        } else {
-          const p = t.pointAt(dist);
-          x = p.x + Math.sin(p.heading) * lat * (size * 0.0012);
-          y = p.y - Math.cos(p.heading) * lat * (size * 0.0012);
-        }
-        const label = showAllLabels || car.isPlayer || car.id === selectedId || car === leader;
-        return (
-          <Marker key={car.id} car={car} position={order.indexOf(car) + 1} x={x} y={y} r={r} selected={car.id === selectedId} label={label} onSelect={onSelect} />
-        );
-      })}
+      {link && (
+        <line x1={link[0].x} y1={link[0].y} x2={link[1].x} y2={link[1].y} stroke="#e6e9f0" strokeWidth={r * 0.18} strokeDasharray={`${r * 0.5} ${r * 0.4}`} />
+      )}
+      {placed.map(({ car, x, y }) => (
+        <Marker
+          key={car.id}
+          car={car}
+          position={order.indexOf(car) + 1}
+          x={x}
+          y={y}
+          r={r}
+          selected={car.id === selectedId}
+          spot={spotlight.includes(car.id)}
+          label={showAllLabels || car.isPlayer || car.id === selectedId || car === leader}
+          onSelect={onSelect}
+        />
+      ))}
       {sc && (
         <g transform={`translate(${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`}>
           <rect x={-r * 1.6} y={-r * 1.1} width={r * 3.2} height={r * 2.2} rx={r * 0.4} fill="#ffb020" stroke="#0b0d12" strokeWidth={r * 0.25} />

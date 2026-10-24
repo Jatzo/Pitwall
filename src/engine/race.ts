@@ -152,6 +152,8 @@ export interface RaceEvent {
   lap: number;
   kind: EventKind;
   carId?: string;
+  /** The other car involved: the car passed, for an overtake. */
+  otherId?: string;
   message: string;
 }
 
@@ -889,7 +891,7 @@ export class RaceSim {
     if (lapped) return;
     this.overtakeCount++;
     const pos = this.standings().indexOf(car) + 1;
-    this.addEvent('overtake', `${car.driver.code} passes ${victim.driver.code} for P${pos}`, car.id);
+    this.addEvent('overtake', `${car.driver.code} passes ${victim.driver.code} for P${pos}`, car.id, victim.id);
   }
 
   // ------------------------------------------------------------ pit stops
@@ -1265,13 +1267,14 @@ export class RaceSim {
     this.standingsCache = null;
   }
 
-  private addEvent(kind: EventKind, message: string, carIdValue?: string): void {
+  private addEvent(kind: EventKind, message: string, carIdValue?: string, otherId?: string): void {
     this.events.push({
       id: this.eventSeq++,
       t: this.time,
       lap: Math.min(this.totalLaps, this.leaderLap() + 1),
       kind,
       carId: carIdValue,
+      ...(otherId === undefined ? {} : { otherId }),
       message,
     });
   }
