@@ -20,6 +20,9 @@
     "circuits": "node scripts/track-info.ts"
   },
   "dependencies": {
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/saira-semi-condensed": "^5.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

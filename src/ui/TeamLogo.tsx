@@ -26,7 +26,7 @@ export function TeamLogo({ team, size = 28 }: Props) {
         width={size}
         height={size}
         alt={`${team.name} logo`}
-        style={{ objectFit: 'contain', borderRadius: 4, flex: 'none' }}
+        style={{ objectFit: 'contain', borderRadius: 2, flex: 'none' }}
       />
     );
   }

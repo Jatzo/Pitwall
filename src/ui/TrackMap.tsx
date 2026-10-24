@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import type { CarState, RaceSim } from '../engine/race.ts';
 import { PIT_LANE_OFFSET_M } from '../engine/track.ts';
+import { inkFor } from './colour.ts';
 
 interface Props {
   sim: RaceSim;
@@ -13,19 +14,6 @@ interface Props {
   frame: number;
   /** Cars the story on screen is about: ringed, and linked when there are two. */
   spotlight?: readonly string[];
-}
-
-/** Black or white, whichever reads better on a team colour. */
-export function inkFor(hex: string): string {
-  const n = Number.parseInt(hex.replace('#', ''), 16);
-  if (Number.isNaN(n)) return '#fff';
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
-    const v = c / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  });
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  // Contrast against black beats contrast against white above about 0.18.
-  return luminance > 0.18 ? '#0b0d12' : '#fff';
 }
 
 function interp(prev: number, cur: number, alpha: number): number {
