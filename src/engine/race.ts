@@ -614,7 +614,7 @@ export class RaceSim {
   private endSafetyCar(): void {
     this.sc.active = false;
     this.sc.lapsLeft = 0;
-    this.addEvent('green', 'Green flag - racing resumes');
+    this.addEvent('green', 'Green flag, racing resumes');
   }
 
   /** Where to draw the safety car, if it is out. */
