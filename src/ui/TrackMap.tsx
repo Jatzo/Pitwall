@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import type { CarState, RaceSim } from '../engine/race.ts';
 import { hashString } from '../engine/rng.ts';
 import { PIT_LANE_OFFSET_M } from '../engine/track.ts';
+import type { Track } from '../engine/track.ts';
 import { CIRCUIT, LOOKS, settingFor } from './circuitLook.ts';
 import { carPose } from './markers.ts';
 import type { Pose } from './markers.ts';
@@ -22,12 +23,30 @@ interface Props {
 }
 
 /** Teams in grid order, which is also their order of garages along the pit lane. */
-function garageOrder(sim: RaceSim): string[] {
+export function garageOrder(sim: RaceSim): string[] {
   return [...new Set(sim.cars.map((c) => c.team.id))];
 }
 
 function f(n: number): string {
   return n.toFixed(1);
+}
+
+/** The map's view of a circuit: its bounds plus a margin, in whole metres. */
+export function mapView(t: Track): { x: number; y: number; w: number; h: number; box: string } {
+  const size = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY);
+  const pad = size * 0.08;
+  const x = Number((t.bounds.minX - pad).toFixed(0));
+  const y = Number((t.bounds.minY - pad).toFixed(0));
+  const w = Number((t.bounds.maxX - t.bounds.minX + pad * 2).toFixed(0));
+  const h = Number((t.bounds.maxY - t.bounds.minY + pad * 2).toFixed(0));
+  return { x, y, w, h, box: `${x} ${y} ${w} ${h}` };
+}
+
+/** The ground is built once per race and shared by the map and the camera, which draw the same thing. */
+const groundCache = new WeakMap<RaceSim, unknown>();
+function once<T>(sim: RaceSim, make: () => T): T {
+  if (!groundCache.has(sim)) groundCache.set(sim, make());
+  return groundCache.get(sim) as T;
 }
 
 /** Open or closed outlines joined into one path. */
@@ -54,9 +73,9 @@ function dotsPath(dots: readonly Dot[]): string {
  * corner tags. It renders once per race in its own SVG under the cars, so a
  * frame repaints only the car layer.
  */
-const Ground = memo(function Ground({ sim, viewBox }: { sim: RaceSim; viewBox: string }) {
+export const Ground = memo(function Ground({ sim, viewBox }: { sim: RaceSim; viewBox: string }) {
   const t = sim.track;
-  const geo = useMemo(() => {
+  const geo = useMemo(() => once(sim, () => {
     const setting = settingFor(t.def.id);
     const look = LOOKS[setting];
     const sc = buildScenery(t, setting, hashString(t.def.id));
@@ -120,7 +139,7 @@ const Ground = memo(function Ground({ sim, viewBox }: { sim: RaceSim; viewBox: s
       }),
       d: t.svgPath(1),
     };
-  }, [t, sim]);
+  }), [t, sim]);
   const { look, sc, road, centre } = geo;
   const e = sc.extent;
   const fill = (kind: 'water' | 'shore' | 'patch') => (kind === 'water' ? look.water : kind === 'shore' ? look.shore : look.patch);
@@ -183,7 +202,7 @@ const Ground = memo(function Ground({ sim, viewBox }: { sim: RaceSim; viewBox: s
       <line {...geo.start} stroke={CIRCUIT.edge} strokeWidth={road * 0.3} />
       <line {...geo.start} stroke={CIRCUIT.tag} strokeWidth={road * 0.3} strokeDasharray={`${road * 0.15} ${road * 0.15}`} />
       {sc.tags.map((g) => (
-        <g key={g.n} transform={`translate(${f(g.x)} ${f(g.y)})`}>
+        <g key={g.n} className="corner-tag" transform={`translate(${f(g.x)} ${f(g.y)})`}>
           <rect x={-g.w / 2} y={-g.h / 2} width={g.w} height={g.h} fill={CIRCUIT.tag} fillOpacity={0.85} />
           <text textAnchor="middle" dominantBaseline="central" fontSize={g.h * 0.72} fill={CIRCUIT.tagText}>
             {g.n}
@@ -195,7 +214,7 @@ const Ground = memo(function Ground({ sim, viewBox }: { sim: RaceSim; viewBox: s
 });
 
 /** An arrow in team colours pointing the way the car travels, with its place on a tag beside it. */
-function Marker({
+export function Marker({
   car,
   position,
   pose,
@@ -263,8 +282,7 @@ function Marker({
 
 export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels, spotlight = [] }: Props) {
   const t = sim.track;
-  const pad = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY) * 0.08;
-  const vb = `${(t.bounds.minX - pad).toFixed(0)} ${(t.bounds.minY - pad).toFixed(0)} ${(t.bounds.maxX - t.bounds.minX + pad * 2).toFixed(0)} ${(t.bounds.maxY - t.bounds.minY + pad * 2).toFixed(0)}`;
+  const vb = mapView(t).box;
   const size = Math.max(t.bounds.maxX - t.bounds.minX, t.bounds.maxY - t.bounds.minY);
   const r = size * 0.015;
 

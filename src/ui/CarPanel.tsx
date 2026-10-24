@@ -14,6 +14,9 @@ interface Props {
   car: CarState;
   tick: number;
   dispatch: (cmd: RaceCommand) => void;
+  /** Whether the camera is locked on this car. */
+  following: boolean;
+  onFollow: (carId: string | null) => void;
 }
 
 const PACE: { id: PaceMode; label: string; hint: string }[] = [
@@ -36,7 +39,7 @@ function Meter({ value, color, mark }: { value: number; color: string; mark?: nu
   );
 }
 
-export function CarPanel({ sim, car, dispatch }: Props) {
+export function CarPanel({ sim, car, dispatch, following, onFollow }: Props) {
   const mine = car.isPlayer;
   const out = car.status === 'out' || car.status === 'finished';
   const wearPct = car.tyre.wear;
@@ -69,6 +72,17 @@ export function CarPanel({ sim, car, dispatch }: Props) {
           </div>
         </div>
         {car.status === 'out' && <div className="bad" style={{ marginTop: 8 }}>Retired: {car.outReason ?? 'unknown'}</div>}
+        {car.status !== 'out' && (
+          <button
+            className={`btn small ${following ? 'active' : ''}`}
+            style={{ marginTop: 8 }}
+            aria-pressed={following}
+            onClick={() => onFollow(following ? null : car.id)}
+            title="Keep the camera on this car until you press Auto"
+          >
+            {following ? 'Following on camera' : 'Follow on camera'}
+          </button>
+        )}
 
         <div className="kv" style={{ marginTop: 12 }}>
           <span className="muted">Last lap</span>

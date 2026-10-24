@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RaceSim } from '../engine/race.ts';
 import type { RaceConfig } from '../engine/race.ts';
 import type { RaceCommand } from '../engine/types.ts';
+import { CameraView } from './CameraView.tsx';
 import { CarPanel } from './CarPanel.tsx';
 import { DecisionPrompt } from './DecisionPrompt.tsx';
+import { direct } from './director.ts';
+import type { Direction } from './director.ts';
 import { weatherWord } from './Conditions.tsx';
 import { EventFeed } from './EventFeed.tsx';
 import { nextMoment, watchMoments } from './moments.ts';
@@ -66,6 +69,7 @@ export function RaceScreen({ config, onFinish }: Props) {
   const [moment, setMoment] = useState<Moment | null>(null);
   const [pauseForMoments, setPauseForMoments] = useState(() => loadFlag(PAUSE_KEY));
   const [storiesOn, setStoriesOn] = useState(() => loadFlag(STORIES_KEY));
+  const [followId, setFollowId] = useState<string | null>(null);
 
   const playingRef = useRef(playing);
   const speedRef = useRef(speed);
@@ -80,6 +84,9 @@ export function RaceScreen({ config, onFinish }: Props) {
   // Real seconds of play: it stops while paused or while a decision is open, so stories never expire unseen.
   const storyClockRef = useRef(0);
   const storyRef = useRef<Story | null>(null);
+  const followRef = useRef(followId);
+  const directionRef = useRef<Direction | null>(null);
+  followRef.current = followId;
   storiesOnRef.current = storiesOn;
   playingRef.current = playing && moment === null;
   speedRef.current = speed;
@@ -117,6 +124,7 @@ export function RaceScreen({ config, onFinish }: Props) {
       }
       alphaRef.current = Math.min(1, accRef.current / STEP);
       storyRef.current = storiesOnRef.current ? storyQueueRef.current.current(storyClockRef.current, holdFor(speedRef.current)) : null;
+      directionRef.current = direct(sim, directionRef.current, storyClockRef.current, storyRef.current, followRef.current);
       setFrame((f) => (f + 1) % 1_000_000);
       if (now - lastTick > 180) {
         lastTick = now;
@@ -272,13 +280,26 @@ export function RaceScreen({ config, onFinish }: Props) {
           {moment && <DecisionPrompt sim={sim} moment={moment} dispatch={dispatch} onResume={resume} />}
         </div>
         {storiesOn && <StoryBanner story={storyRef.current} glance={glance(sim)} onSelect={setSelectedId} />}
-        <div className="panel" style={{ maxHeight: 190, overflow: 'auto' }}>
-          <h3>Race control</h3>
-          <EventFeed sim={sim} tick={tick} />
+        <div className="race-lower">
+          <div className="panel race-control">
+            <h3>Race control</h3>
+            <EventFeed sim={sim} tick={tick} />
+          </div>
+          <CameraView
+            sim={sim}
+            shot={directionRef.current?.shot ?? null}
+            alpha={alphaRef.current}
+            speed={speed}
+            frame={frame}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            following={directionRef.current?.shot.kind === 'follow'}
+            onAuto={() => setFollowId(null)}
+          />
         </div>
       </div>
 
-      <div className="col">{selected ? <CarPanel sim={sim} car={selected} tick={tick} dispatch={dispatch} /> : <div className="panel muted">Select a car on the map or in the timing tower.</div>}</div>
+      <div className="col">{selected ? <CarPanel sim={sim} car={selected} tick={tick} dispatch={dispatch} following={followId === selected.id} onFollow={setFollowId} /> : <div className="panel muted">Select a car on the map or in the timing tower.</div>}</div>
     </div>
   );
 }
