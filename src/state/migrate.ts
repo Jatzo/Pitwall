@@ -61,7 +61,19 @@ function withSections(raw: Raw, teams: readonly TeamDef[]): Raw | null {
   if (!Array.isArray(drivers) || drivers.length !== 2 || !drivers.every((d) => isObject(d) && typeof d.driverId === 'string' && typeof d.salary === 'number' && isInt(d.seasonsLeft, 0)) || drivers[0].driverId === drivers[1].driverId) return null;
   const development = raw.development ?? emptyDevelopment();
   if (!readDevelopment(development)) return null;
-  return { ...raw, finance, drivers, development };
+  const sponsor = raw.sponsor ?? null;
+  if (sponsor !== null && !readSponsor(sponsor)) return null;
+  return { ...raw, finance, drivers, development, sponsor };
+}
+
+function readSponsor(deal: unknown): boolean {
+  if (!isObject(deal) || typeof deal.name !== 'string' || typeof deal.base !== 'number' || typeof deal.bonus !== 'number' || !isInt(deal.season, 1)) return false;
+  if (deal.tier !== 'safe' && deal.tier !== 'balanced' && deal.tier !== 'ambitious') return false;
+  const o = deal.objective;
+  if (!isObject(o)) return false;
+  if (o.kind === 'points' || o.kind === 'bothFinish') return true;
+  if (o.kind === 'topN') return isInt(o.n, 1);
+  return o.kind === 'beat' && typeof o.teamId === 'string';
 }
 
 const isArea = (v: unknown): boolean => typeof v === 'string' && (AREAS as readonly string[]).includes(v);

@@ -75,6 +75,28 @@ export interface Development {
   delivered: Delivery[];
 }
 
+/** What a sponsor asks of a race. */
+export type Objective =
+  | { kind: 'points' }
+  | { kind: 'bothFinish' }
+  /** A classified car at or above this position. */
+  | { kind: 'topN'; n: number }
+  /** The player's best car ahead of that team's best car. */
+  | { kind: 'beat'; teamId: string };
+
+export type SponsorTier = 'safe' | 'balanced' | 'ambitious';
+
+/** A season's sponsor: a base payment every race and a bonus when the objective is met, in millions of pounds. */
+export interface SponsorDeal {
+  name: string;
+  tier: SponsorTier;
+  base: number;
+  bonus: number;
+  objective: Objective;
+  /** The season the deal runs for. */
+  season: number;
+}
+
 export interface Career {
   version: 2;
   seed: number;
@@ -92,12 +114,14 @@ export interface Career {
   /** The player team's two drivers, in seat order. */
   drivers: [DriverContract, DriverContract];
   development: Development;
+  /** This season's sponsor, or null until one is signed. A deal from an earlier season pays nothing. */
+  sponsor: SponsorDeal | null;
 }
 
 export const CALENDAR: readonly string[] = SEASON_CALENDAR;
 
 export function newCareer(playerTeamId: string, teams: readonly TeamDef[], seed = Math.floor(Math.random() * 2 ** 31)): Career {
-  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId), development: emptyDevelopment() };
+  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId), development: emptyDevelopment(), sponsor: null };
 }
 
 /** Index of the next race to run (equals the number of races completed). */

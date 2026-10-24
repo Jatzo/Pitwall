@@ -2,8 +2,9 @@
  * Balance check for the management layer: `npm run season -- --seasons 3 --seeds 3`.
  * Plays whole careers headless, set up as the weekend hub sets up a race, for
  * a few teams with two policies: one that buys the most lap time per pound,
- * and one that never spends. It prints each team's championship place by
- * season, its money, and the gap between the fastest and slowest car.
+ * and one that never spends. Both sign the same sponsor tier each season. It
+ * prints each team's championship place by season, its money, the gap between
+ * the fastest and slowest car, and how often each tier's objective was met.
  */
 
 import { defaultTeams } from '../src/data/teams.ts';
@@ -19,6 +20,7 @@ import { AREAS, carryOver, deliverProjects, projectOptions, startProject } from 
 import type { Area, ProjectOption } from '../src/state/development.ts';
 import { effectiveTeams } from '../src/state/effectiveTeams.ts';
 import { settleRace } from '../src/state/finance.ts';
+import { SPONSORS, chooseSponsor, objectiveMet, sponsorOffers } from '../src/state/sponsors.ts';
 import { isSeasonOver, newCareer, raceSeed, recordRace, teamStandings } from '../src/state/season.ts';
 import type { Career } from '../src/state/season.ts';
 
@@ -32,6 +34,8 @@ const seeds = Number(arg('seeds', '2'));
 const playerTeams = arg('teams', 'aurora,solstice,cobalt,halcyon').split(',');
 const fraction = Number(arg('fraction', '0.35'));
 const reserve = Number(arg('reserve', '2'));
+const tier = SPONSORS.tiers.findIndex((t) => t.tier === arg('sponsor', 'balanced'));
+if (tier < 0) throw new Error(`--sponsor must be one of ${SPONSORS.tiers.map((t) => t.tier).join(', ')}`);
 const editor = defaultTeams();
 const geoms = new Map(SEASON_CALENDAR.map((id) => [id, new Track(trackById(id))]));
 
@@ -84,20 +88,27 @@ interface SeasonLine {
   balance: number;
   car: number;
   spread: number;
+  /** Races in which each tier's objective was met, safe first. */
+  hits: number[];
 }
 
 function play(teamId: string, policy: Policy, seed: number): SeasonLine[] {
   let career = newCareer(teamId, editor, seed);
   const lines: SeasonLine[] = [];
   for (let s = 1; s <= seasons; s++) {
+    const offers = sponsorOffers(career, effectiveTeams(editor, career));
+    career = chooseSponsor(career, offers[tier]);
+    const hits = offers.map(() => 0);
     while (!isSeasonOver(career)) {
       if (policy === 'spend') career = buy(career);
       career = raceOnce(career);
+      const rows = career.results[career.results.length - 1].rows;
+      offers.forEach((o, i) => (hits[i] += objectiveMet(o.objective, rows, teamId) ? 1 : 0));
     }
     const teams = effectiveTeams(editor, career);
     const place = teamStandings(career.results, teams).findIndex((t) => t.teamId === teamId) + 1;
     const perfs = teams.map(perf);
-    lines.push({ place, balance: career.finance.balance, car: perf(teams.find((t) => t.id === teamId)!), spread: Math.max(...perfs) - Math.min(...perfs) });
+    lines.push({ place, balance: career.finance.balance, car: perf(teams.find((t) => t.id === teamId)!), spread: Math.max(...perfs) - Math.min(...perfs), hits });
     career = { ...career, season: career.season + 1, roundsBefore: career.roundsBefore + career.results.length, results: [], development: carryOver(career.development) };
   }
   return lines;
@@ -106,9 +117,9 @@ function play(teamId: string, policy: Policy, seed: number): SeasonLine[] {
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const startPlace = (id: string) => [...editor].sort((a, b) => perf(b) - perf(a)).findIndex((t) => t.id === id) + 1;
 
-console.log(`\n${seasons} seasons, ${seeds} seeds, races at ${Math.round(fraction * 100)}% distance, reserve £${reserve}m`);
+console.log(`\n${seasons} seasons, ${seeds} seeds, races at ${Math.round(fraction * 100)}% distance, reserve £${reserve}m, ${SPONSORS.tiers[tier].tier} sponsor`);
 console.log(`Seconds a lap per point: ${AREAS.map((a) => `${a} ${SECONDS_PER_POINT[a].toFixed(4)}`).join(', ')}\n`);
-console.log('Team       Policy  Car rank  ' + Array.from({ length: seasons }, (_, i) => `S${i + 1} place  £m     car `).join(' ') + ' spread');
+console.log('Team       Policy  Car rank  ' + Array.from({ length: seasons }, (_, i) => `S${i + 1} place  £m     car `).join(' ') + ' spread          met safe/bal/amb');
 const t0 = performance.now();
 for (const id of playerTeams) {
   for (const policy of ['spend', 'none'] as Policy[]) {
@@ -118,7 +129,9 @@ for (const id of playerTeams) {
       return `${avg(at.map((l) => l.place)).toFixed(1).padStart(8)}  ${avg(at.map((l) => l.balance)).toFixed(1).padStart(5)}  ${avg(at.map((l) => l.car)).toFixed(1).padStart(5)}`;
     });
     const spread = Array.from({ length: seasons }, (_, s) => avg(runs.map((r) => r[s].spread)).toFixed(1)).join('/');
-    console.log(`${id.padEnd(10)} ${policy.padEnd(6)} ${String(startPlace(id)).padStart(8)}  ${cols.join(' ')}  ${spread}`);
+    const races = runs.length * seasons * SEASON_CALENDAR.length;
+    const met = SPONSORS.tiers.map((_, i) => `${Math.round((100 * runs.flat().reduce((n, l) => n + l.hits[i], 0)) / races)}%`).join('/');
+    console.log(`${id.padEnd(10)} ${policy.padEnd(6)} ${String(startPlace(id)).padStart(8)}  ${cols.join(' ')}  ${spread.padEnd(15)} ${met}`);
   }
 }
 const base = editor.map(perf);

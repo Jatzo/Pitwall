@@ -34,16 +34,20 @@ export const DEVELOPMENT = {
   ] as const satisfies readonly { kind: ProjectKind; label: string; rounds: number; gain: number; risk: number; price: number }[],
   cap: 99,
   maxProjects: 2,
-  /** £m for one point at a rating of 60, rising with the square of the rating's distance towards the cap. */
+  /**
+   * £m for one point at a rating of 60, rising with the fourth power of the
+   * rating's distance towards the cap: a point at 84 costs about half what
+   * one at 92 does, so the front of the grid cannot buy its way clear.
+   */
   pointCost: 0.45,
-  curve: 5,
+  curve: 8,
   /**
    * £m per round for a rival whose car costs what a rating of 80 costs. Each
    * budget is scaled by what the rival's own level costs, so every rival
    * gains about the same points a round and the field does not close up;
    * the strongest gets 10% more and the weakest 10% less on top.
    */
-  rivalBudget: 0.4,
+  rivalBudget: 0.27,
   /** Share of every gain lost at the start of each season. */
   drift: 0.25,
   deliveredKeep: 20,
@@ -57,7 +61,7 @@ export function emptyDevelopment(): Development {
 
 export function costPerPoint(rating: number): number {
   const k = Math.max(0, (rating - 60) / (DEVELOPMENT.cap - 60));
-  return DEVELOPMENT.pointCost * (1 + DEVELOPMENT.curve * k * k);
+  return DEVELOPMENT.pointCost * (1 + DEVELOPMENT.curve * k ** 4);
 }
 
 /** Rounds raced in the whole career so far. */

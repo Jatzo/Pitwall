@@ -1,6 +1,7 @@
 /**
- * The team's money, in millions of pounds. A race pays a start fee and prize
- * money by points, and costs driver salaries, running costs and repairs. The
+ * The team's money, in millions of pounds. A race pays a start fee, prize
+ * money by points and the sponsor's money, and costs driver salaries, running
+ * costs and repairs. The
  * balance may fall below zero through running costs; while it does, no
  * upgrade can be started (see development), and the debt carries over.
  */
@@ -8,6 +9,7 @@
 import { carOverall } from '../data/teams.ts';
 import type { DriverDef, TeamDef } from '../engine/types.ts';
 import type { Career, DriverContract, LedgerEntry } from './season.ts';
+import { objectiveMet } from './sponsors.ts';
 
 /** Every amount the economy uses, in one place so the season script can tune them. */
 export const ECONOMY = {
@@ -65,6 +67,11 @@ export function settleRace(career: Career): { career: Career; lines: LedgerEntry
   const line = (label: string, amount: number): LedgerEntry => ({ season: career.season, round: race.round, label, amount: money(amount) });
   const lines: LedgerEntry[] = [line('Start money', ECONOMY.startFee)];
   if (points > 0) lines.push(line(`Prize money (${points === 1 ? '1 point' : `${points} points`})`, points * ECONOMY.perPoint));
+  const deal = career.sponsor?.season === career.season ? career.sponsor : null;
+  if (deal) {
+    lines.push(line(`Sponsor: ${deal.name}`, deal.base));
+    if (objectiveMet(deal.objective, race.rows, career.playerTeamId)) lines.push(line(`Sponsor bonus: ${deal.name}`, deal.bonus));
+  }
   lines.push(line('Driver salaries', -(career.drivers[0].salary + career.drivers[1].salary)));
   lines.push(line('Running costs', -ECONOMY.running));
   if (collisions > 0) lines.push(line(collisions === 1 ? 'Repairs (one car)' : 'Repairs (both cars)', -ECONOMY.repair * collisions));
