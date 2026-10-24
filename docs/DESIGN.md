@@ -117,6 +117,10 @@ The interface borrows from television race graphics: near-black panels, one raci
 - Shape: sharp corners throughout, with an angled cut on three things only: the race bar, status pills and the story team block.
 - Checked by `src/ui/theme.test.ts`: every text colour against every surface it sits on, at WCAG AA (4.5:1), and the ink on every default team colour. The test also fails if a colour is written into the stylesheet outside the token list.
 
+The race map draws each circuit in its surroundings, made from the circuit's own geometry: kerbs at every numbered corner, gravel or tarmac run-off on the outside of slow corners, three grandstands and the pit building. Around them sits a setting picked per circuit in `src/ui/circuitLook.ts`: countryside, parkland, moorland, forest, mountain, coast, or a street circuit's city blocks and harbour. Each kind of shape has a band of distance from the track and the pit lane, from the road edge for kerbs to at least 50 m back for trees and city blocks. A shape that breaks its band is dropped, never moved, and `src/ui/scenery.test.ts` measures every shape on every circuit against its band by brute force.
+
+The scenery is built once per race, in 5 to 19 ms, into its own SVG under a second SVG that holds only the cars, so a frame repaints the cars and nothing else. In headless Chrome at 32x, a race frame takes about 15 ms, against 20 ms when the circuit and the cars shared one SVG, and hiding the scenery makes no measurable difference.
+
 ## Testing
 
 `node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), and season standings.

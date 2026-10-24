@@ -169,6 +169,10 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .race .center { min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .trackbox { flex: 1; min-height: 240px; position: relative; padding: 6px; }
 .trackbox svg { width: 100%; height: 100%; display: block; }
+/* The scenery and the cars are two stacked SVGs: the scenery gets its own layer, so a frame repaints only the cars. */
+.map-stack { position: relative; width: 100%; height: 100%; }
+.map-stack > svg { position: absolute; inset: 0; }
+.map-ground { will-change: transform; }
 .trackbox svg text { font-family: var(--display); font-weight: 700; }
 @media (max-width: 1100px) {
   .app.fixed { height: auto; }
