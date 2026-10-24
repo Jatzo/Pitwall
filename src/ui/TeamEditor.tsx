@@ -71,14 +71,14 @@ export function TeamEditor({ teams, onChange, onReset, onClose }: Props) {
 
   return (
     <div className="page stack">
-      <div className="row">
-        <h2 style={{ flex: 1, fontSize: 24 }}>Teams and drivers</h2>
+      <div className="row wrap">
+        <h2 className="page-title" style={{ flex: 1 }}>Teams and drivers</h2>
         <button className="btn" onClick={onReset}>Reset all to defaults</button>
         <button className="btn primary" onClick={onClose}>Done</button>
       </div>
       <div className="muted">Rename teams and drivers, pick colours, and design or upload a logo. Changes save automatically and apply everywhere, including the map and timing tower.</div>
 
-      <div className="grid2" style={{ gridTemplateColumns: '260px minmax(0, 1fr)', alignItems: 'start' }}>
+      <div className="editor-grid">
         <div className="panel" style={{ padding: 6 }}>
           {teams.map((t) => (
             <button
@@ -187,7 +187,7 @@ export function TeamEditor({ teams, onChange, onReset, onClose }: Props) {
                 </div>
               );
             })}
-            <div className="muted" style={{ fontSize: 12 }}>Ratings stay fixed so every team keeps the same competitive balance. Names are cosmetic.</div>
+            <div className="muted small">Ratings stay fixed so every team keeps the same competitive balance. Names are cosmetic.</div>
           </div>
         </div>
       </div>

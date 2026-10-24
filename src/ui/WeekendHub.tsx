@@ -16,6 +16,7 @@ import { PlanEditor } from './PlanEditor.tsx';
 import { Standings } from './Standings.tsx';
 import { TeamLogo } from './TeamLogo.tsx';
 import { TrackOutline } from './TrackOutline.tsx';
+import { cssVar } from './colour.ts';
 
 export interface RaceSetup {
   trackId: string;
@@ -87,17 +88,17 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
     <div className="page stack">
       <div className="row wrap">
         <div style={{ flex: 1 }}>
-          <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          <div className="muted label-caps">
             Round {round + 1} of {career.calendar.length}
           </div>
-          <h2 style={{ fontSize: 26 }}>{trackDef.name}</h2>
+          <h2 className="page-title">{trackDef.name}</h2>
           <div className="muted">{trackDef.location}</div>
         </div>
         <button className="btn" onClick={onCalendar}>Season calendar</button>
         <TeamLogo team={playerTeam} size={44} />
         <div>
           <b>{playerTeam.name}</b>
-          <div className="muted" style={{ fontSize: 12 }}>Team principal</div>
+          <div className="muted small">Team principal</div>
         </div>
       </div>
 
@@ -128,12 +129,12 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
               </span>
               <span className="muted num">{laps} laps</span>
             </div>
-            {quali && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Locked once qualifying has run.</div>}
+            {quali && <div className="muted small" style={{ marginTop: 6 }}>Locked once qualifying has run.</div>}
           </div>
 
           <div className="panel">
             <h3>Weather forecast</h3>
-            <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+            <div className="muted small" style={{ marginBottom: 6 }}>
               It rains at some point in about {Math.round(rainChance * 100)}% of races here. Chance of rain in each quarter of this race:
             </div>
             <div className="forecast" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }} role="list" aria-label="Rain forecast by quarter of the race">
@@ -145,7 +146,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
                 </div>
               ))}
             </div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+            <div className="muted small" style={{ marginTop: 6 }}>
               {wetStart
                 ? 'It is raining at the start: intermediates or full wets can be chosen as the start tyre.'
                 : 'Forecasts further ahead are less certain. In the race, the next half hour is shown in 5-minute steps.'}
@@ -158,7 +159,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
         <div className="stack">
           <div className="panel">
             <div className="row" style={{ marginBottom: 8 }}>
-              <h3 style={{ margin: 0, flex: 1 }}>Qualifying</h3>
+              <h3 className="panel-head" style={{ margin: 0, flex: 1 }}>Qualifying</h3>
               <button className="btn primary" onClick={runQuali} disabled={!!quali}>
                 {quali ? 'Completed' : 'Run qualifying'}
               </button>
@@ -178,7 +179,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
                         <td className="num">{r.position}</td>
                         <td>
                           <span className="team-chip">
-                            <span className="swatch" style={{ background: info.team.colors.primary }} />
+                            <span className="swatch" style={cssVar('--team', info.team.colors.primary)} />
                             {info.name}
                           </span>
                         </td>
@@ -202,8 +203,8 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
             return (
               <div className="panel" key={id}>
                 <div className="row" style={{ marginBottom: 8 }}>
-                  <span className="swatch" style={{ background: playerTeam.colors.primary }} />
-                  <h3 style={{ margin: 0, flex: 1 }}>Strategy: {driver.name}</h3>
+                  <span className="swatch" style={cssVar('--team', playerTeam.colors.primary)} />
+                  <h3 className="panel-head" style={{ margin: 0, flex: 1 }}>Strategy: {driver.name}</h3>
                   {quali && <span className="muted num">grid P{quali.grid.indexOf(id) + 1}</span>}
                 </div>
                 <PlanEditor
@@ -218,7 +219,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar }: Props) {
             );
           })}
 
-          <button className="btn primary" style={{ padding: '12px 16px', fontSize: 16 }} onClick={start} disabled={!quali}>
+          <button className="btn primary big" onClick={start} disabled={!quali}>
             {quali ? 'Go to the grid' : 'Run qualifying first'}
           </button>
         </div>

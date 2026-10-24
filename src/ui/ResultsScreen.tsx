@@ -5,6 +5,7 @@ import { trackById } from '../data/tracks.ts';
 import type { Career } from '../state/season.ts';
 import { isSeasonOver } from '../state/season.ts';
 import { Standings } from './Standings.tsx';
+import { cssVar } from './colour.ts';
 
 interface Props {
   career: Career;
@@ -28,7 +29,7 @@ export function ResultsScreen({ career, teams, rows, trackId, laps, onContinue }
     <div className="page stack">
       <div className="row wrap">
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 24 }}>{track.name} results</h2>
+          <h2 className="page-title">{track.name} results</h2>
           <div className="muted">
             Round {career.results.length} of {career.calendar.length} · {laps} laps{winner ? ` · won by ${winner.name} (${winner.team.shortName})` : ''}
           </div>
@@ -68,7 +69,7 @@ export function ResultsScreen({ career, teams, rows, trackId, laps, onContinue }
                     <td className="num">{r.finished ? r.position : '-'}</td>
                     <td>
                       <span className="team-chip">
-                        <span className="swatch" style={{ background: info.team.colors.primary }} />
+                        <span className="swatch" style={cssVar('--team', info.team.colors.primary)} />
                         {info.name}
                         {r.penaltyS > 0 && <span className="bad num"> +{r.penaltyS}s</span>}
                       </span>
@@ -83,7 +84,7 @@ export function ResultsScreen({ career, teams, rows, trackId, laps, onContinue }
               })}
             </tbody>
           </table>
-          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Purple marks the fastest lap (one extra point if the driver finishes in the top ten).</div>
+          <div className="muted small" style={{ marginTop: 8 }}>Purple marks the fastest lap (one extra point if the driver finishes in the top ten).</div>
         </div>
         <Standings results={career.results} teams={teams} playerTeamId={career.playerTeamId} />
       </div>

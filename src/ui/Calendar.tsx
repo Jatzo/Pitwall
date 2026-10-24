@@ -46,7 +46,7 @@ export function Calendar({ career, teams, onBack }: Props) {
   return (
     <div className="page stack">
       <div className="row wrap">
-        <h2 style={{ flex: 1, fontSize: 26 }}>Season calendar</h2>
+        <h2 className="page-title" style={{ flex: 1 }}>Season calendar</h2>
         <button className="btn" onClick={onBack}>Back</button>
       </div>
       <ol className="calendar">
@@ -60,13 +60,13 @@ export function Calendar({ career, teams, onBack }: Props) {
                 <TrackOutline track={track} height={110} />
               </div>
               <div className="stack" style={{ gap: 4, minWidth: 0 }}>
-                <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                <div className="muted label-caps">
                   Round {round + 1}
                   {round === next && ' · next'}
                 </div>
-                <b style={{ fontSize: 16 }}>{def.name}</b>
-                <div className="muted" style={{ fontSize: 13 }}>{def.location}</div>
-                {def.summary && <div style={{ fontSize: 13 }}>{def.summary}</div>}
+                <b className="round-name">{def.name}</b>
+                <div className="muted note">{def.location}</div>
+                {def.summary && <div className="note">{def.summary}</div>}
                 <div className="calendar-facts">
                   <span><b className="num">{(track.length / 1000).toFixed(2)}</b> km</span>
                   <span><b className="num">{track.refAvgKph.toFixed(0)}</b> km/h average</span>
@@ -75,7 +75,7 @@ export function Calendar({ career, teams, onBack }: Props) {
                   <span>Passing <b>{passingWord(def)}</b></span>
                 </div>
                 {summary && (
-                  <div style={{ fontSize: 13 }}>
+                  <div className="note">
                     Won by {summary.winnerCarId ? driverName(summary.winnerCarId) : 'nobody'}.{' '}
                     {summary.playerBest !== null ? `Your best: ${ordinal(summary.playerBest)}, ${summary.playerPoints} points.` : 'Both your cars retired.'}
                   </div>

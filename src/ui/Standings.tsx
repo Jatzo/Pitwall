@@ -3,6 +3,7 @@ import { driverStandings, teamStandings } from '../state/season.ts';
 import type { RaceRecord } from '../state/season.ts';
 import type { TeamDef } from '../engine/types.ts';
 import { TeamLogo } from './TeamLogo.tsx';
+import { cssVar } from './colour.ts';
 
 interface Props {
   results: readonly RaceRecord[];
@@ -21,7 +22,7 @@ export function Standings({ results, teams, playerTeamId }: Props) {
   return (
     <div className="panel">
       <div className="row" style={{ marginBottom: 8 }}>
-        <h3 style={{ margin: 0, flex: 1 }}>Championship</h3>
+        <h3 className="panel-head" style={{ margin: 0, flex: 1 }}>Championship</h3>
         <span className="btn-group">
           <button className={`btn small ${tab === 'drivers' ? 'active' : ''}`} onClick={() => setTab('drivers')}>Drivers</button>
           <button className={`btn small ${tab === 'teams' ? 'active' : ''}`} onClick={() => setTab('teams')}>Teams</button>
@@ -48,7 +49,7 @@ export function Standings({ results, teams, playerTeamId }: Props) {
                     <td className="num muted">{i + 1}</td>
                     <td>
                       <span className="team-chip">
-                        <span className="swatch" style={{ background: team.colors.primary }} />
+                        <span className="swatch" style={cssVar('--team', team.colors.primary)} />
                         {drv.name} <span className="muted">{team.shortName}</span>
                       </span>
                     </td>

@@ -16,6 +16,7 @@ import { TeamEditor } from './ui/TeamEditor.tsx';
 import { TeamLogo } from './ui/TeamLogo.tsx';
 import { WeekendHub } from './ui/WeekendHub.tsx';
 import type { RaceSetup } from './ui/WeekendHub.tsx';
+import { cssVar } from './ui/colour.ts';
 
 type Screen =
   | { name: 'menu' }
@@ -63,7 +64,7 @@ function Menu({
       )}
 
       <div className="row">
-        <h2 style={{ flex: 1, fontSize: 18 }}>{career ? 'Or start a new season' : 'Choose your team'}</h2>
+        <h2 className="section-title" style={{ flex: 1 }}>{career ? 'Or start a new season' : 'Choose your team'}</h2>
         <button className="btn" onClick={onTeams}>Edit teams, drivers and logos</button>
       </div>
       <div className="team-cards">
@@ -73,14 +74,14 @@ function Menu({
             <button
               key={t.id}
               className={`team-card ${pick === t.id ? 'sel' : ''}`}
-              style={{ borderLeftColor: t.colors.primary }}
+              style={cssVar('--team', t.colors.primary)}
               onClick={() => setPick(t.id)}
               aria-pressed={pick === t.id}
             >
               <TeamLogo team={t} size={44} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <b>{t.name}</b>
-                <div className="muted" style={{ fontSize: 12 }}>{t.drivers[0].name} · {t.drivers[1].name}</div>
+                <div className="muted small">{t.drivers[0].name} · {t.drivers[1].name}</div>
                 <div className="bars">
                   <span>Car</span>
                   <div className="bar"><i style={{ width: `${carOverall(c)}%` }} /></div>
@@ -191,7 +192,7 @@ export function App() {
     case 'season':
       body = career ? (
         <div className="page stack">
-          <h2 style={{ fontSize: 26 }}>Season complete</h2>
+          <h2 className="page-title">Season complete</h2>
           <Standings results={career.results} teams={teams} playerTeamId={career.playerTeamId} />
           <div className="row">
             <button className="btn primary" onClick={() => setScreen({ name: 'menu' })}>Back to menu</button>
@@ -220,7 +221,7 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className={screen.name === 'race' ? 'app fixed' : 'app'}>
       <header className="topbar">
         <span className="brand">Pitwall</span>
         <span className="spacer" />

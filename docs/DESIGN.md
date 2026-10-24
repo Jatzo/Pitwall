@@ -108,6 +108,15 @@ Qualifying uses the same car and driver ratings as the race, plus three sources 
 
 The last tuning pass narrowed the car spread (`carSecPerPoint` 0.085 to 0.07), widened race-day form (`formSigma` 0.2 to 0.3), and taught the AI to save its tyres when nobody is within reach (`cruiseGap`), as real leaders do. Before it, pole won 65% of races, only 3% were won from fourth or lower, and the average margin was 15.2 s.
 
+## Look
+
+The interface borrows from television race graphics: near-black panels, one racing red, and a condensed display face.
+
+- Type: Saira Semi Condensed for titles, positions and driver codes; Barlow for text; JetBrains Mono for every time and gap. All three are bundled from Fontsource (SIL Open Font Licence), Latin characters only, about 164 KB in total.
+- Colour: every colour is a token in `src/styles.css`. Red marks rules, active controls and the selected car; a lighter red is used for red text, because the strong red is too dark for small text on near-black. Timing colours follow television graphics: purple for the fastest lap of the race, green for a driver's personal best, amber for the safety car and blue for rain. Text on a team colour picks black or white by brightness.
+- Shape: sharp corners throughout, with an angled cut on three things only: the race bar, status pills and the story team block.
+- Checked by `src/ui/theme.test.ts`: every text colour against every surface it sits on, at WCAG AA (4.5:1), and the ink on every default team colour. The test also fails if a colour is written into the stylesheet outside the token list.
+
 ## Testing
 
 `node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), and season standings.
