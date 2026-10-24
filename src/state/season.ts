@@ -5,7 +5,8 @@
 
 import { SEASON_CALENDAR } from '../data/tracks.ts';
 import type { ScoredRow } from '../engine/scoring.ts';
-import type { TeamDef } from '../engine/types.ts';
+import type { CarRatings, TeamDef } from '../engine/types.ts';
+import { emptyDevelopment } from './development.ts';
 import { startingMoney } from './finance.ts';
 
 export interface RaceRecordRow {
@@ -43,6 +44,37 @@ export interface DriverContract {
   seasonsLeft: number;
 }
 
+export type ProjectKind = 'quick' | 'upgrade' | 'major';
+
+/** A car project being built. Rounds count across the whole career, as `roundsBefore` does. */
+export interface Project {
+  area: keyof CarRatings;
+  kind: ProjectKind;
+  cost: number;
+  gain: number;
+  startedAt: number;
+  /** The project arrives once this many career rounds have been raced. */
+  deliverAt: number;
+}
+
+/** A project that arrived, after the race of that season and round. */
+export interface Delivery {
+  season: number;
+  round: number;
+  area: keyof CarRatings;
+  kind: ProjectKind;
+  gain: number;
+  /** False when a bad result gave half the gain. */
+  full: boolean;
+}
+
+/** The player car's development: points gained over the editor's car, projects being built, and the newest arrivals first. */
+export interface Development {
+  gains: Partial<CarRatings>;
+  projects: Project[];
+  delivered: Delivery[];
+}
+
 export interface Career {
   version: 2;
   seed: number;
@@ -59,12 +91,13 @@ export interface Career {
   finance: { balance: number; ledger: LedgerEntry[] };
   /** The player team's two drivers, in seat order. */
   drivers: [DriverContract, DriverContract];
+  development: Development;
 }
 
 export const CALENDAR: readonly string[] = SEASON_CALENDAR;
 
 export function newCareer(playerTeamId: string, teams: readonly TeamDef[], seed = Math.floor(Math.random() * 2 ** 31)): Career {
-  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId) };
+  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId), development: emptyDevelopment() };
 }
 
 /** Index of the next race to run (equals the number of races completed). */

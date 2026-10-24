@@ -74,7 +74,7 @@ describe('save migration', () => {
   });
 
   it('refuses broken data rather than starting over quietly', () => {
-    for (const text of ['{not json', '42', '{"version":1}', JSON.stringify({ ...v1, results: 'x' }), JSON.stringify({ ...v1, results: [{ rows: [{ carId: 5 }] }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], finance: { balance: 'lots', ledger: [] } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], drivers: [{ driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }, { driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }] })]) {
+    for (const text of ['{not json', '42', '{"version":1}', JSON.stringify({ ...v1, results: 'x' }), JSON.stringify({ ...v1, results: [{ rows: [{ carId: 5 }] }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], finance: { balance: 'lots', ledger: [] } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], drivers: [{ driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }, { driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], development: { gains: { wings: 3 }, projects: [], delivered: [] } })]) {
       assert.equal(parseSave(null, text, teams).status, 'unreadable', text.slice(0, 40));
     }
   });

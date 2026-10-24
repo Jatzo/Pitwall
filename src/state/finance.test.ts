@@ -104,8 +104,10 @@ describe('money', () => {
     const older: Partial<Career> = { ...career };
     delete older.finance;
     delete older.drivers;
+    delete older.development;
     const again = parseSave(JSON.stringify(older), null, teams);
     assert.equal(again.status, 'ok');
     assert.equal((again as { career: Career }).career.finance.balance, startingBalance(teams, career.playerTeamId));
+    assert.deepEqual((again as { career: Career }).career.development, { gains: {}, projects: [], delivered: [] });
   });
 });

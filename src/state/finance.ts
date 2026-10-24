@@ -15,8 +15,8 @@ export const ECONOMY = {
   startMin: 10,
   startMax: 17,
   /** Paid to every team that starts a race. */
-  startFee: 0.5,
-  perPoint: 0.1,
+  startFee: 0.6,
+  perPoint: 0.04,
   running: 0.4,
   /** A car retired by a collision; damage that does not retire a car is not recorded. */
   repair: 0.5,

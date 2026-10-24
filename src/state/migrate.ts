@@ -5,6 +5,7 @@
  */
 
 import type { TeamDef } from '../engine/types.ts';
+import { AREAS, emptyDevelopment } from './development.ts';
 import { startingMoney } from './finance.ts';
 import { driverIdFor } from './season.ts';
 import type { Career, RaceRecord, RaceRecordRow } from './season.ts';
@@ -58,7 +59,19 @@ function withSections(raw: Raw, teams: readonly TeamDef[]): Raw | null {
   if (!isObject(finance) || typeof finance.balance !== 'number' || !Array.isArray(finance.ledger)) return null;
   const drivers = raw.drivers ?? fresh.drivers;
   if (!Array.isArray(drivers) || drivers.length !== 2 || !drivers.every((d) => isObject(d) && typeof d.driverId === 'string' && typeof d.salary === 'number' && isInt(d.seasonsLeft, 0)) || drivers[0].driverId === drivers[1].driverId) return null;
-  return { ...raw, finance, drivers };
+  const development = raw.development ?? emptyDevelopment();
+  if (!readDevelopment(development)) return null;
+  return { ...raw, finance, drivers, development };
+}
+
+const isArea = (v: unknown): boolean => typeof v === 'string' && (AREAS as readonly string[]).includes(v);
+const isKind = (v: unknown): boolean => v === 'quick' || v === 'upgrade' || v === 'major';
+
+function readDevelopment(dev: unknown): boolean {
+  if (!isObject(dev) || !isObject(dev.gains) || !Array.isArray(dev.projects) || !Array.isArray(dev.delivered)) return false;
+  if (!Object.entries(dev.gains).every(([a, v]) => isArea(a) && typeof v === 'number')) return false;
+  if (!dev.projects.every((p) => isObject(p) && isArea(p.area) && isKind(p.kind) && typeof p.gain === 'number' && typeof p.cost === 'number' && isInt(p.startedAt, 0) && isInt(p.deliverAt, 0))) return false;
+  return dev.delivered.every((d) => isObject(d) && isArea(d.area) && isKind(d.kind) && typeof d.gain === 'number');
 }
 
 function fromVersion1(raw: Raw, teams: readonly TeamDef[]): SaveResult {

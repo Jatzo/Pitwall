@@ -17,7 +17,8 @@
     "test": "node --test \"src/**/*.test.ts\"",
     "sim": "node scripts/sim.ts",
     "calibrate": "node scripts/calibrate.ts",
-    "circuits": "node scripts/track-info.ts"
+    "circuits": "node scripts/track-info.ts",
+    "season": "node scripts/season.ts"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.3.0",

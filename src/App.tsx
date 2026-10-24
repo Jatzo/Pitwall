@@ -6,6 +6,7 @@ import type { ScoredRow } from './engine/scoring.ts';
 import type { RaceConfig, RaceSim } from './engine/race.ts';
 import type { TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
+import { deliverProjects } from './state/development.ts';
 import { effectiveTeams } from './state/effectiveTeams.ts';
 import { settleRace } from './state/finance.ts';
 import { isSeasonOver, newCareer, recordRace } from './state/season.ts';
@@ -159,7 +160,7 @@ export function App() {
   const finishRace = (sim: RaceSim) => {
     if (!career) return;
     const rows = scoreRace(sim.results(), sim.fastestLap?.carId ?? null);
-    const next = settleRace(recordRace(career, sim.totalLaps, rows, racing)).career;
+    const next = deliverProjects(settleRace(recordRace(career, sim.totalLaps, rows, racing)).career).career;
     setCareer(next);
     saveCareer(next);
     setScreen({ name: 'results', rows, trackId: sim.track.def.id, laps: sim.totalLaps });

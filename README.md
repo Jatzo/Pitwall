@@ -19,7 +19,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Deterministic design:** a separate seeded random stream for each purpose.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 294 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 307 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -64,6 +64,7 @@ npm run sim -- --track silverwood --seed 3   # run a whole race headless and pri
 npm run calibrate -- --seeds 30               # 300 races, averages for the calibration table in docs/DESIGN.md
 npm run calibrate -- --seeds 30 --weather     # the same, with each circuit's chance of rain as in the game
 npm run circuits                              # circuit numbers, and redraw docs/circuits.svg
+npm run season -- --seasons 3 --seeds 3     # whole careers headless, spending against not spending, for the economy
 ```
 
 Pushing to `main` runs tests and the build, then deploys `dist/` to GitHub Pages (enable Pages with the "GitHub Actions" source in the repository settings).
