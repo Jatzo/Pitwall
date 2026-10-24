@@ -19,7 +19,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Deterministic design:** a separate seeded random stream for each purpose.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 262 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 272 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game

@@ -20,7 +20,8 @@ export type StoryKind =
   | 'pb'
   | 'battle'
   | 'fastest'
-  | 'lead';
+  | 'lead'
+  | 'radio';
 
 export interface Story {
   kind: StoryKind;
@@ -32,13 +33,15 @@ export interface Story {
   team: string;
   headline: string;
   detail: string;
-  label: 'Your car' | 'Battle' | 'Headline';
+  label: 'Your car' | 'Battle' | 'Headline' | 'Team radio';
   /** Read out by the strip's status region; false when race control already announces it. */
   announce: boolean;
   /** For a place story: places gained (negative when lost) and the position now. */
   delta?: number;
   position?: number;
   code?: string;
+  /** For a rival pitting: true when it pitted from just ahead of the player's car. */
+  rivalAhead?: boolean;
 }
 
 /** Own-car place changes are never dropped from the queue; everything below waits at most MAX_WAIT_S. */
@@ -47,6 +50,8 @@ export const PRIORITY: Record<StoryKind, number> & { ownRetire: number; ownFaste
   ownRetire: 95,
   tyres: 85,
   rivalPit: 80,
+  // Below the factual stories about the same car, so a line never pushes its event off the strip.
+  radio: 78,
   closing: 75,
   threat: 75,
   pb: 70,
@@ -213,6 +218,7 @@ export function nextStories(sim: RaceSim, watch: StoryWatch): Story[] {
         found.push({
           ...base(mine, 'rivalPit', PRIORITY.rivalPit, 'Your car', true),
           carIds: [mine.id, car.id],
+          rivalAhead,
           headline: rivalAhead
             ? `${car.driver.code} pits from just ahead of ${mine.driver.code}`
             : `${car.driver.code} pits from just behind ${mine.driver.code}`,
@@ -340,6 +346,8 @@ export function holdFor(speed: number): number {
 
 /** A story older than this is dropped rather than shown late (own place changes excepted). */
 export const MAX_WAIT_S = 1.5;
+/** A radio line answers a story shown just before it, so it waits through that story's hold. */
+export const RADIO_WAIT_S = 6;
 
 function mergePlace(a: Story, b: Story): Story {
   const delta = (a.delta ?? 0) + (b.delta ?? 0);
@@ -375,7 +383,7 @@ export class StoryQueue {
   /** The story on screen at `now`; a new one is picked when the last has had `hold` seconds. */
   current(now: number, hold: number): Story | null {
     if (this.shown && now < this.shown.until) return this.shown.story;
-    this.pending = this.pending.filter((p) => p.story.priority >= PRIORITY.place || now - p.at <= MAX_WAIT_S);
+    this.pending = this.pending.filter((p) => p.story.priority >= PRIORITY.place || now - p.at <= (p.story.kind === 'radio' ? RADIO_WAIT_S : MAX_WAIT_S));
     if (this.pending.length === 0) {
       this.shown = null;
       return null;
