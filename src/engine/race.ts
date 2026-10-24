@@ -465,7 +465,7 @@ export class RaceSim {
       car.reaction = Math.max(0.15, car.rng.normal(0.3 - (startSkill - 80) * 0.003, 0.05));
       car.lapNoise = car.rng.normal(0, this.lapSigma(car));
     }
-    this.addEvent('lights', 'Lights out and away we go!');
+    this.addEvent('lights', 'Lights out and away we go.');
   }
 
   // ------------------------------------------------------------- commands
@@ -576,7 +576,7 @@ export class RaceSim {
     if (candidates.length === 0) return;
     const victim = this.wetness > 0 ? this.pickWetVictim(candidates) : this.eventRng.pick(candidates);
     if (this.eventRng.chance(0.5)) {
-      this.addEvent('incident', `${victim.driver.code} is out after contact!`, victim.id);
+      this.addEvent('incident', `${victim.driver.code} is out after contact.`, victim.id);
       this.retire(victim, 'Collision', 0.85);
     } else {
       victim.damage += this.eventRng.range(0.8, 2.2);
@@ -695,7 +695,7 @@ export class RaceSim {
       car.damage += 3;
       car.tyre.wear = 1.02;
       if (car.pitRequest === null) car.pitRequest = this.chooseNextCompound(car);
-      this.addEvent('incident', `${car.driver.code} has a puncture!`, car.id);
+      this.addEvent('incident', `${car.driver.code} has a puncture.`, car.id);
       if (this.eventRng.chance(0.3)) this.deploySafetyCar('Debris on track');
     }
   }
@@ -1096,7 +1096,7 @@ export class RaceSim {
     // Race end.
     if (!this.raceOver && car.lap >= this.totalLaps) {
       this.raceOver = true;
-      this.addEvent('finish', `${car.driver.code} wins the race!`, car.id);
+      this.addEvent('finish', `${car.driver.code} wins the race.`, car.id);
     }
     if (this.raceOver && car.status !== 'out') {
       car.status = 'finished';
