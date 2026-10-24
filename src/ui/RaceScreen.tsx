@@ -9,6 +9,8 @@ import { EventFeed } from './EventFeed.tsx';
 import { nextMoment, watchMoments } from './moments.ts';
 import type { Moment } from './moments.ts';
 import { StoryBanner } from './StoryBanner.tsx';
+import type { RaceGlance } from './StoryBanner.tsx';
+import { formatLap } from '../engine/format.ts';
 import { StoryQueue, holdFor, nextStories, watchStories } from './stories.ts';
 import type { Story } from './stories.ts';
 import { TimingTower } from './TimingTower.tsx';
@@ -34,6 +36,18 @@ function saveFlag(key: string, on: boolean): void {
   } catch {
     // Storage unavailable: the preference lasts for this race only.
   }
+}
+
+function glance(sim: RaceSim): RaceGlance {
+  if (sim.phase === 'grid') return { leader: null, gapToSecond: null, fastest: null };
+  const [first, second] = sim.standings();
+  const gap = second ? sim.gapToAhead(second) : null;
+  const fastest = sim.fastestLap ? sim.carById(sim.fastestLap.carId) : undefined;
+  return {
+    leader: first?.driver.code ?? null,
+    gapToSecond: gap !== null ? `${gap.toFixed(1)} s` : null,
+    fastest: fastest && sim.fastestLap ? `${fastest.driver.code} ${formatLap(sim.fastestLap.time)}` : null,
+  };
 }
 
 interface Props {
@@ -192,7 +206,7 @@ export function RaceScreen({ config, onFinish }: Props) {
   return (
     <div className="race">
       <div className="panel controls">
-        <b>{sim.track.def.name}</b>
+        <b className="track-name">{sim.track.def.name}</b>
         <span className="muted">{sim.track.def.location}</span>
         {pill}
         <span className="num">Lap {done ? sim.totalLaps : lap} / {sim.totalLaps}</span>
@@ -257,7 +271,7 @@ export function RaceScreen({ config, onFinish }: Props) {
           />
           {moment && <DecisionPrompt sim={sim} moment={moment} dispatch={dispatch} onResume={resume} />}
         </div>
-        {storiesOn && <StoryBanner story={storyRef.current} onSelect={setSelectedId} />}
+        {storiesOn && <StoryBanner story={storyRef.current} glance={glance(sim)} onSelect={setSelectedId} />}
         <div className="panel" style={{ maxHeight: 190, overflow: 'auto' }}>
           <h3>Race control</h3>
           <EventFeed sim={sim} tick={tick} />

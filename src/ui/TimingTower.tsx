@@ -3,6 +3,7 @@ import { formatGap, formatLap } from '../engine/format.ts';
 import { sessionBests } from '../engine/insights.ts';
 import type { CarState, RaceSim } from '../engine/race.ts';
 import { COMPOUNDS } from '../engine/tyres.ts';
+import { cssVar } from './colour.ts';
 
 interface Props {
   sim: RaceSim;
@@ -40,9 +41,9 @@ export function TimingTower({ sim, selectedId, onSelect }: Props) {
 
   return (
     <div className="tower">
-      <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-        <span className="muted" style={{ fontSize: 12 }}>
-          Lap <b className="num" style={{ color: 'var(--text)' }}>{Math.min(sim.totalLaps, (lead?.lap ?? 0) + 1)}</b> / {sim.totalLaps}
+      <div className="row tools">
+        <span className="muted small">
+          Lap <b className="num strong">{Math.min(sim.totalLaps, (lead?.lap ?? 0) + 1)}</b> / {sim.totalLaps}
         </span>
         <span className="btn-group">
           <button className={`btn small ${mode === 'interval' ? 'active' : ''}`} onClick={() => setMode('interval')}>
@@ -96,14 +97,14 @@ export function TimingTower({ sim, selectedId, onSelect }: Props) {
             }}
           >
             <span className="pos num">{car.status === 'out' ? '' : i + 1}</span>
-            <span className="swatch" style={{ background: car.team.colors.primary }} />
+            <span className="teambar" style={cssVar('--team', car.team.colors.primary)} />
             <span className="code">{car.driver.code}</span>
             <span className={`num ${st === 'PIT' ? 'warn' : ''}`} style={{ textAlign: 'right' }}>{gap}</span>
             <span className={`num ${isBest ? 'purple' : isPb ? 'good' : ''}`} style={{ textAlign: 'right' }}>
               {car.lastLap !== null ? formatLap(car.lastLap) : '--'}
             </span>
             <span className="tyre">
-              <span className="tyre-dot" style={{ borderColor: spec.color }}>{car.tyre.compound}</span>
+              <span className="tyre-dot" style={cssVar('--tyre', spec.color)}>{car.tyre.compound}</span>
               <span className="num muted">{Math.floor(car.tyre.ageLaps)}</span>
             </span>
             <span className="sectors" title="Sectors of the last lap">

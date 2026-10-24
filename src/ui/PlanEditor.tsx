@@ -3,6 +3,7 @@ import type { AnalyseOptions } from '../engine/insights.ts';
 import type { WearRates } from '../engine/strategy.ts';
 import { COMPOUNDS, DRY_COMPOUNDS } from '../engine/tyres.ts';
 import type { Compound, StrategyPlan } from '../engine/types.ts';
+import { cssVar } from './colour.ts';
 
 interface Props {
   plan: StrategyPlan;
@@ -34,7 +35,7 @@ export function CompoundSelect({
         <button
           key={c}
           type="button"
-          className={`btn small ${value === c ? 'active' : ''}`}
+          className={`btn small tyre-choice ${value === c ? 'active' : ''}`}
           style={value === c ? { borderColor: COMPOUNDS[c].color } : undefined}
           onClick={() => onChange(c)}
           title={COMPOUNDS[c].name}
@@ -73,11 +74,11 @@ export function PlanEditor({ plan, totalLaps, rates, onChange, lockStart, opts, 
       <div className="row wrap">
         <span className="muted" style={{ width: 52 }}>Start</span>
         {lockStart ? (
-          <span className="tyre-dot" style={{ borderColor: COMPOUNDS[plan.startCompound].color }}>{plan.startCompound}</span>
+          <span className="tyre-dot" style={cssVar('--tyre', COMPOUNDS[plan.startCompound].color)}>{plan.startCompound}</span>
         ) : (
           <CompoundSelect value={plan.startCompound} onChange={(c) => onChange({ ...plan, startCompound: c })} options={startOptions} />
         )}
-        <span className="muted num" style={{ fontSize: 12 }}>
+        <span className="muted num small">
           {report.stints[0] ? `to lap ${report.stints[0].toLap} (~${Math.round(report.stints[0].endWear * 100)}% worn)` : ''}
         </span>
       </div>
@@ -86,7 +87,7 @@ export function PlanEditor({ plan, totalLaps, rates, onChange, lockStart, opts, 
         <div className="row wrap" key={i}>
           <span className="muted" style={{ width: 52 }}>Stop {i + 1}</span>
           <label className="row" style={{ gap: 4 }}>
-            <span className="muted" style={{ fontSize: 12 }}>lap</span>
+            <span className="muted small">lap</span>
             <input
               type="number"
               className="num"
@@ -98,7 +99,7 @@ export function PlanEditor({ plan, totalLaps, rates, onChange, lockStart, opts, 
             />
           </label>
           <CompoundSelect value={s.compound} onChange={(c) => setStop(i, { compound: c })} />
-          <span className="muted num" style={{ fontSize: 12 }}>
+          <span className="muted num small">
             {report.stints[i + 1] ? `${report.stints[i + 1].laps} laps, ~${Math.round(report.stints[i + 1].endWear * 100)}%` : ''}
           </span>
           <button className="btn small" type="button" onClick={() => onChange({ ...plan, stops: plan.stops.filter((_, k) => k !== i) })} aria-label={`Remove stop ${i + 1}`}>

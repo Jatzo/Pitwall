@@ -43,12 +43,12 @@ export function Conditions({ sim }: Props) {
         <b style={{ left: '14%' }} />
         <b style={{ left: '56%' }} />
       </div>
-      <div className="muted" style={{ fontSize: 12, margin: '6px 0 10px' }}>
+      <div className="muted small" style={{ margin: '6px 0 10px' }}>
         {sim.wetness > 0
           ? `${CLASS_NAMES[best]} suit the line now. ${classCostLine(sim.wetness)}.`
           : 'Dry line. Intermediates would lose about 2.5 s a lap here.'}
       </div>
-      <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Chance of rain, next 30 minutes</div>
+      <div className="muted small" style={{ marginBottom: 4 }}>Chance of rain, next 30 minutes</div>
       <div className="forecast" role="list" aria-label="Rain forecast for the next 30 minutes">
         {windows.map((w, i) => (
           <div key={w.fromS} role="listitem" aria-label={`${i === 0 ? 'Now' : `In ${i * 5} minutes`}: ${Math.round(w.chance * 100)}% chance of rain`}>

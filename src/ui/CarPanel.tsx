@@ -7,6 +7,7 @@ import type { EngineMode, PaceMode, RaceCommand, StrategyPlan } from '../engine/
 import { TeamLogo } from './TeamLogo.tsx';
 import { Conditions } from './Conditions.tsx';
 import { PlanEditor } from './PlanEditor.tsx';
+import { cssVar } from './colour.ts';
 
 interface Props {
   sim: RaceSim;
@@ -55,16 +56,16 @@ export function CarPanel({ sim, car, dispatch }: Props) {
         <div className="row">
           <TeamLogo team={car.team} size={34} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ fontSize: 16, color: 'var(--text)', textTransform: 'none', letterSpacing: 0, margin: 0 }}>
+            <h3 className="car-title">
               <span className="num muted">#{car.driver.number}</span> {car.driver.name}
             </h3>
-            <div className="muted" style={{ fontSize: 12 }}>{car.team.name}</div>
+            <div className="muted small">{car.team.name}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div className="num" style={{ fontSize: 20, fontWeight: 700 }}>
+            <div className="pos-big">
               {car.status === 'out' ? 'OUT' : `P${sim.standings().indexOf(car) + 1}`}
             </div>
-            <div className="muted num" style={{ fontSize: 12 }}>grid {car.grid}</div>
+            <div className="muted num small">grid {car.grid}</div>
           </div>
         </div>
         {car.status === 'out' && <div className="bad" style={{ marginTop: 8 }}>Retired: {car.outReason ?? 'unknown'}</div>}
@@ -98,7 +99,7 @@ export function CarPanel({ sim, car, dispatch }: Props) {
       <div className="panel">
         <h3>Tyres and fuel</h3>
         <div className="row" style={{ marginBottom: 6 }}>
-          <span className="tyre-dot" style={{ borderColor: COMPOUNDS[car.tyre.compound].color }}>{car.tyre.compound}</span>
+          <span className="tyre-dot" style={cssVar('--tyre', COMPOUNDS[car.tyre.compound].color)}>{car.tyre.compound}</span>
           <span>{COMPOUNDS[car.tyre.compound].name}</span>
           <span className="muted num">{Math.floor(car.tyre.ageLaps)} laps old</span>
           <span style={{ flex: 1 }} />
@@ -106,8 +107,8 @@ export function CarPanel({ sim, car, dispatch }: Props) {
         </div>
         <Meter value={wearPct} color={wearColor} mark={CLIFF_START} />
         {!out && (
-          <div className="muted" style={{ fontSize: 12, margin: '6px 0 12px' }}>
-            About <b className="num" style={{ color: 'var(--text)' }}>{Math.floor(lapsLeft)}</b> laps left before the tyres are finished
+          <div className="muted small" style={{ margin: '6px 0 12px' }}>
+            About <b className="num strong">{Math.floor(lapsLeft)}</b> laps left before the tyres are finished
             {wearPct > CLIFF_START && <span className="bad"> (past the performance cliff)</span>}
           </div>
         )}
@@ -117,9 +118,9 @@ export function CarPanel({ sim, car, dispatch }: Props) {
           <span className="num">{car.fuel.toFixed(1)} kg</span>
         </div>
         <Meter value={fuelFrac} color={spare < 0 ? 'var(--bad)' : 'var(--text)'} />
-        {!out && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+        {!out && <div className="muted small" style={{ marginTop: 6 }}>
           {spare >= 0 ? (
-            <>Enough for the finish with <b className="num" style={{ color: 'var(--text)' }}>{spare.toFixed(1)}</b> laps spare</>
+            <>Enough for the finish with <b className="num strong">{spare.toFixed(1)}</b> laps spare</>
           ) : (
             <span className="bad">Short of fuel by {(-spare).toFixed(1)} laps. Lean the engine or conserve.</span>
           )}
@@ -134,7 +135,7 @@ export function CarPanel({ sim, car, dispatch }: Props) {
             <h3>Driving</h3>
             <div className="stack" style={{ gap: 10 }}>
               <div>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Pace</div>
+                <div className="muted small" style={{ marginBottom: 4 }}>Pace</div>
                 <span className="btn-group">
                   {PACE.map((p) => (
                     <button key={p.id} className={`btn small ${car.paceMode === p.id ? 'active' : ''}`} title={p.hint} onClick={() => dispatch({ type: 'pace', carId: car.id, mode: p.id })}>
@@ -144,7 +145,7 @@ export function CarPanel({ sim, car, dispatch }: Props) {
                 </span>
               </div>
               <div>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Engine</div>
+                <div className="muted small" style={{ marginBottom: 4 }}>Engine</div>
                 <span className="btn-group">
                   {ENGINE.map((p) => (
                     <button key={p.id} className={`btn small ${car.engineMode === p.id ? 'active' : ''}`} title={p.hint} onClick={() => dispatch({ type: 'engine', carId: car.id, mode: p.id })}>
@@ -167,7 +168,7 @@ export function CarPanel({ sim, car, dispatch }: Props) {
               {PIT_COMPOUNDS.map((c) => (
                 <button
                   key={c}
-                  className={`btn small ${car.pitRequest === c ? 'active' : ''}`}
+                  className={`btn small tyre-choice ${car.pitRequest === c ? 'active' : ''}`}
                   disabled={remaining <= 1 || car.status === 'pitLane'}
                   onClick={() => dispatch({ type: 'pit', carId: car.id, compound: car.pitRequest === c ? null : c })}
                   title={`Pit at the next entry and fit ${COMPOUNDS[c].name}s`}
@@ -178,7 +179,7 @@ export function CarPanel({ sim, car, dispatch }: Props) {
               {car.pitRequest && <span className="warn">Box requested: {COMPOUNDS[car.pitRequest].name}</span>}
             </div>
             {car.status === 'running' && (
-              <div className="muted" style={{ fontSize: 12, margin: '-4px 0 10px' }}>
+              <div className="muted small" style={{ margin: '-4px 0 10px' }}>
                 {sim.sc.active
                   ? 'Safety car: the field is bunched, so a stop now costs few places.'
                   : `A stop now rejoins about P${rejoinEstimate(sim, car, TUNING.pitLossPlan)}.`}

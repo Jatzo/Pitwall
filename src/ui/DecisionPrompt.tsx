@@ -7,6 +7,7 @@ import type { RaceCommand } from '../engine/types.ts';
 import { CLASS_NAMES, classCostLine } from './Conditions.tsx';
 import { MIN_TYRE_AGE_FOR_SC_STOP, promptCars } from './moments.ts';
 import type { Moment } from './moments.ts';
+import { cssVar } from './colour.ts';
 
 interface Props {
   sim: RaceSim;
@@ -54,12 +55,12 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
             <div className="row" style={{ gap: 8 }}>
               <b>{car.driver.code}</b>
               <span className="num">P{position}</span>
-              <span className="tyre-dot" style={{ borderColor: COMPOUNDS[car.tyre.compound].color }}>{car.tyre.compound}</span>
+              <span className="tyre-dot" style={cssVar('--tyre', COMPOUNDS[car.tyre.compound].color)}>{car.tyre.compound}</span>
               <span className="muted num">
                 {Math.floor(car.tyre.ageLaps)} laps, {Math.round(car.tyre.wear * 100)}% worn
               </span>
             </div>
-            <div className="muted" style={{ fontSize: 12 }}>
+            <div className="muted small">
               {next ? `Plan: stop on lap ${next.lap} for ${COMPOUNDS[next.compound].name.toLowerCase()}s.` : 'Plan: no more stops.'}
               {moment.kind !== 'safetycar' && ` A stop now rejoins about P${rejoin}.`}
               {moment.kind === 'safetycar' &&
@@ -67,11 +68,11 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
                 ' These tyres are barely used, so a stop gains little unless you want a different compound.'}
             </div>
             <div className="row wrap" style={{ gap: 6 }}>
-              <span className="muted" style={{ fontSize: 12 }}>Box for</span>
+              <span className="muted small">Box for</span>
               {PIT_COMPOUNDS.map((c) => (
                 <button
                   key={c}
-                  className={`btn small ${car.pitRequest === c ? 'active' : ''}`}
+                  className={`btn small tyre-choice ${car.pitRequest === c ? 'active' : ''}`}
                   aria-pressed={car.pitRequest === c}
                   onClick={() => dispatch({ type: 'pit', carId: car.id, compound: car.pitRequest === c ? null : c })}
                 >
@@ -83,7 +84,7 @@ export function DecisionPrompt({ sim, moment, dispatch, onResume }: Props) {
         );
       })}
       <button ref={resumeRef} className="btn primary" onClick={onResume}>
-        {cars.some((c) => c.pitRequest) ? 'Resume race' : 'Stay out and resume'} <span style={{ opacity: 0.8, fontWeight: 400 }}>(Space)</span>
+        {cars.some((c) => c.pitRequest) ? 'Resume race' : 'Stay out and resume'} <span className="key-hint">(Space)</span>
       </button>
     </div>
   );
