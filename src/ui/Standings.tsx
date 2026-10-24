@@ -14,10 +14,7 @@ interface Props {
 export function Standings({ results, teams, playerTeamId }: Props) {
   const [tab, setTab] = useState<'drivers' | 'teams'>('drivers');
   const byTeam = new Map(teams.map((t) => [t.id, t]));
-  const driverName = (carId: string) => {
-    const [tid, idx] = carId.split(':');
-    return byTeam.get(tid)?.drivers[Number(idx) as 0 | 1];
-  };
+  const drivers = new Map(teams.flatMap((t) => t.drivers.map((d) => [d.id, d] as const)));
 
   return (
     <div className="panel">
@@ -42,10 +39,10 @@ export function Standings({ results, teams, playerTeamId }: Props) {
           {tab === 'drivers'
             ? driverStandings(results, teams).map((d, i) => {
                 const team = byTeam.get(d.teamId);
-                const drv = driverName(d.carId);
+                const drv = drivers.get(d.driverId);
                 if (!team || !drv) return null;
                 return (
-                  <tr key={d.carId} className={d.teamId === playerTeamId ? 'me' : ''}>
+                  <tr key={d.driverId} className={d.teamId === playerTeamId ? 'me' : ''}>
                     <td className="num muted">{i + 1}</td>
                     <td>
                       <span className="team-chip">

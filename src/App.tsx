@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { trackById } from './data/tracks.ts';
 import { carOverall } from './data/teams.ts';
 import { scoreRace } from './engine/scoring.ts';
@@ -30,12 +30,15 @@ type Screen =
 function Menu({
   teams,
   career,
+  saveProblem,
   onNew,
   onContinue,
   onTeams,
 }: {
   teams: TeamDef[];
   career: Career | null;
+  /** Why the saved season could not be read, if it could not. */
+  saveProblem: string | null;
   onNew: (teamId: string) => void;
   onContinue: () => void;
   onTeams: () => void;
@@ -51,6 +54,12 @@ function Menu({
           pit wall while every car circulates the track. All teams, drivers and circuits are fictional.
         </p>
       </div>
+
+      {saveProblem && (
+        <div className="warnbox">
+          Your saved season could not be read, because {saveProblem}. It is still stored, and starting a new season will replace it.
+        </div>
+      )}
 
       {career && savedTeam && (
         <div className="panel row wrap">
@@ -100,7 +109,7 @@ function Menu({
           className="btn primary"
           style={{ padding: '10px 18px' }}
           onClick={() => {
-            if (career && !window.confirm('Starting a new season will replace your saved progress. Continue?')) return;
+            if ((career || saveProblem) && !window.confirm('Starting a new season will replace your saved progress. Continue?')) return;
             onNew(pick);
           }}
         >
@@ -113,7 +122,13 @@ function Menu({
 
 export function App() {
   const [teams, setTeams] = useState<TeamDef[]>(() => loadTeams());
-  const [career, setCareer] = useState<Career | null>(() => loadCareer());
+  const [saved] = useState(() => loadCareer(loadTeams()));
+  const [career, setCareer] = useState<Career | null>(saved.status === 'ok' ? saved.career : null);
+  const [saveProblem, setSaveProblem] = useState<string | null>(saved.status === 'unreadable' ? saved.reason : null);
+  // A season moved up from an older save is written in the current format at once; the old copy stays as a backup.
+  useEffect(() => {
+    if (saved.status === 'ok') saveCareer(saved.career);
+  }, [saved]);
   const [screen, setScreen] = useState<Screen>({ name: 'menu' });
 
   const updateTeams = (next: TeamDef[]) => {
@@ -139,7 +154,7 @@ export function App() {
   const finishRace = (sim: RaceSim) => {
     if (!career) return;
     const rows = scoreRace(sim.results(), sim.fastestLap?.carId ?? null);
-    const next = recordRace(career, sim.totalLaps, rows);
+    const next = recordRace(career, sim.totalLaps, rows, teams);
     setCareer(next);
     saveCareer(next);
     setScreen({ name: 'results', rows, trackId: sim.track.def.id, laps: sim.totalLaps });
@@ -157,8 +172,10 @@ export function App() {
         <Menu
           teams={teams}
           career={career}
+          saveProblem={saveProblem}
           onNew={(teamId) => {
             clearCareer();
+            setSaveProblem(null);
             const c = newCareer(teamId);
             saveCareer(c);
             setCareer(c);

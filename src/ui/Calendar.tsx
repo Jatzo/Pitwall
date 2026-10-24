@@ -37,10 +37,10 @@ function ordinal(n: number): string {
 export function Calendar({ career, teams, onBack }: Props) {
   const tracks = useMemo(() => career.calendar.map((id) => new Track(trackById(id))), [career.calendar]);
   const next = currentRound(career);
-  const driverName = (carId: string): string => {
-    const [teamId, index] = carId.split(':');
-    const team = teams.find((t) => t.id === teamId);
-    return team ? `${team.drivers[Number(index) as 0 | 1].name} (${team.shortName})` : carId;
+  const driverName = (driverId: string): string => {
+    const team = teams.find((t) => t.drivers.some((d) => d.id === driverId));
+    const driver = team?.drivers.find((d) => d.id === driverId);
+    return team && driver ? `${driver.name} (${team.shortName})` : driverId;
   };
 
   return (
@@ -76,7 +76,7 @@ export function Calendar({ career, teams, onBack }: Props) {
                 </div>
                 {summary && (
                   <div className="note">
-                    Won by {summary.winnerCarId ? driverName(summary.winnerCarId) : 'nobody'}.{' '}
+                    Won by {summary.winnerDriverId ? driverName(summary.winnerDriverId) : 'nobody'}.{' '}
                     {summary.playerBest !== null ? `Your best: ${ordinal(summary.playerBest)}, ${summary.playerPoints} points.` : 'Both your cars retired.'}
                   </div>
                 )}
