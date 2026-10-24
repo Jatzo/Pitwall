@@ -2,6 +2,8 @@
 
 A browser-based Formula-style team manager. You run a team through a season: pick a strategy, qualify, then manage tyres, fuel, engine modes and pit stops live from the pit wall while every car circulates a real-time map of the circuit.
 
+**Play it at [jatzo.github.io/Pitwall](https://jatzo.github.io/Pitwall/).** Nothing to install; your season is saved in the browser.
+
 Everything in it is fictional (teams, drivers, circuits), and everything is editable: team names, short names, colours, driver names, codes, numbers, and logos (generated emblems or your own uploaded image).
 
 ![Race screen](docs/screenshots/race.png)
