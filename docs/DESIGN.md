@@ -121,6 +121,8 @@ The race map draws each circuit in its surroundings, made from the circuit's own
 
 The scenery is built once per race, in 5 to 19 ms, into its own SVG under a second SVG that holds only the cars, so a frame repaints the cars and nothing else. In headless Chrome at 32x, a race frame takes about 15 ms, against 20 ms when the circuit and the cars shared one SVG, and hiding the scenery makes no measurable difference.
 
+Cars are arrows in team colours with a dark outline, so they stand out against grass, gravel and asphalt, and each points the way its car travels. On the pit lane the arrow follows the lane's own line, which bends up to 38 degrees away from the track's heading where it leaves and rejoins the circuit. `src/ui/markers.test.ts` checks the direction against each car's movement on the track and on the lane.
+
 ## Testing
 
 `node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), and season standings.

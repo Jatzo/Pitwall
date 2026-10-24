@@ -3,7 +3,8 @@ import type { CarState, RaceSim } from '../engine/race.ts';
 import { hashString } from '../engine/rng.ts';
 import { PIT_LANE_OFFSET_M } from '../engine/track.ts';
 import { CIRCUIT, LOOKS, settingFor } from './circuitLook.ts';
-import { inkFor } from './colour.ts';
+import { carPose } from './markers.ts';
+import type { Pose } from './markers.ts';
 import { buildScenery } from './scenery.ts';
 import type { Area, Dot, Pt } from './scenery.ts';
 
@@ -18,10 +19,6 @@ interface Props {
   frame: number;
   /** Cars the story on screen is about: ringed, and linked when there are two. */
   spotlight?: readonly string[];
-}
-
-function interp(prev: number, cur: number, alpha: number): number {
-  return prev + (cur - prev) * alpha;
 }
 
 /** Teams in grid order, which is also their order of garages along the pit lane. */
@@ -197,11 +194,11 @@ const Ground = memo(function Ground({ sim, viewBox }: { sim: RaceSim; viewBox: s
   );
 });
 
+/** An arrow in team colours pointing the way the car travels, with its place on a tag beside it. */
 function Marker({
   car,
   position,
-  x,
-  y,
+  pose,
   r,
   selected,
   spot,
@@ -210,8 +207,7 @@ function Marker({
 }: {
   car: CarState;
   position: number;
-  x: number;
-  y: number;
+  pose: Pose;
   r: number;
   selected: boolean;
   spot: boolean;
@@ -219,27 +215,37 @@ function Marker({
   onSelect: (id: string) => void;
 }) {
   const pitting = car.status === 'pitLane';
+  const tagW = r * (position >= 10 ? 2.6 : 1.9);
+  const tagH = r * 1.75;
+  const tag = { x: r * 2.2, y: -r * 2.1 };
   return (
-    <g transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} onClick={() => onSelect(car.id)} style={{ cursor: 'pointer' }}>
-      {selected && <circle r={r * 2.1} fill="none" stroke="#fff" strokeWidth={r * 0.28} />}
-      {spot && <circle r={r * 2.7} fill="none" stroke="#e6e9f0" strokeWidth={r * 0.2} strokeDasharray={`${r * 0.7} ${r * 0.5}`} />}
-      {car.isPlayer && <circle r={r * 1.45} fill="none" stroke={car.team.colors.secondary} strokeWidth={r * 0.3} />}
-      <circle r={r} fill={car.team.colors.primary} stroke={pitting ? '#fff' : '#0b0d12'} strokeWidth={r * 0.28} />
-      <text
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={r * (position >= 10 ? 1.05 : 1.25)}
-        fontWeight={800}
-        fill={inkFor(car.team.colors.primary)}
-        style={{ pointerEvents: 'none' }}
-      >
-        {position}
-      </text>
-      {car.drsOn && <circle cx={r * 0.85} cy={-r * 0.85} r={r * 0.32} fill="#2fd27a" stroke="#0b0d12" strokeWidth={r * 0.1} />}
+    <g transform={`translate(${f(pose.x)} ${f(pose.y)})`} onClick={() => onSelect(car.id)} style={{ cursor: 'pointer' }}>
+      {selected && <circle r={r * 2.6} fill="none" stroke="#fff" strokeWidth={r * 0.28} />}
+      {spot && <circle r={r * 3.2} fill="none" stroke="#e6e9f0" strokeWidth={r * 0.2} strokeDasharray={`${r * 0.7} ${r * 0.5}`} />}
+      {car.isPlayer && <circle r={r * 2} fill="none" stroke={car.team.colors.secondary} strokeWidth={r * 0.3} />}
+      <g transform={`rotate(${f((pose.heading * 180) / Math.PI)})`}>
+        {/* A dark outline keeps the arrow readable on grass, gravel, water and asphalt alike. */}
+        <path
+          d={`M${f(r * 2)},0L${f(-r * 1.4)},${f(-r * 1.15)}L${f(-r * 0.75)},0L${f(-r * 1.4)},${f(r * 1.15)}Z`}
+          fill={car.team.colors.primary}
+          stroke={pitting ? '#fff' : CIRCUIT.tag}
+          strokeWidth={r * 0.24}
+          strokeLinejoin="round"
+        />
+        <path d={`M${f(r * 1.2)},0L${f(-r * 0.5)},${f(-r * 0.42)}L${f(-r * 0.5)},${f(r * 0.42)}Z`} fill={car.team.colors.secondary} />
+      </g>
+      <g transform={`translate(${f(tag.x)} ${f(tag.y)})`} style={{ pointerEvents: 'none' }}>
+        <rect x={-tagW / 2} y={-tagH / 2} width={tagW} height={tagH} fill={CIRCUIT.tag} fillOpacity={0.85} />
+        <text textAnchor="middle" dominantBaseline="central" fontSize={r * 1.4} fontWeight={800} fill={CIRCUIT.tagText}>
+          {position}
+        </text>
+        {car.drsOn && <rect x={-tagW / 2} y={tagH / 2} width={tagW} height={r * 0.4} fill={CIRCUIT.drs} />}
+      </g>
       {label && (
         <text
-          x={r * 1.8}
-          y={-r * 1.2}
+          x={tag.x + tagW / 2 + r * 0.4}
+          y={tag.y}
+          dominantBaseline="central"
           fontSize={r * 1.7}
           fontWeight={700}
           fill="#e6e9f0"
@@ -270,18 +276,7 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels, spot
     .filter((c) => c.status !== 'out')
     .sort((a, b) => Number(a.isPlayer) - Number(b.isPlayer) || Number(a.id === selectedId) - Number(b.id === selectedId));
 
-  const placed = draw.map((car) => {
-    const dist = interp(car.prevDist, car.dist, sim.phase === 'racing' ? alpha : 1);
-    const lat = interp(car.prevLat, car.lat, sim.phase === 'racing' ? alpha : 1);
-    if (car.status === 'pitLane' && car.pit) {
-      // On the pit lane: drawn travelling to the team's own garage, not on the racing line.
-      const slot = garages.indexOf(car.team.id);
-      const p = t.pitLanePoint(t.pitDisplayU(dist - car.pit.boxDist, t.garageU(slot, garages.length)));
-      return { car, x: p.x, y: p.y };
-    }
-    const p = t.pointAt(dist);
-    return { car, x: p.x + Math.sin(p.heading) * lat * (size * 0.0012), y: p.y - Math.cos(p.heading) * lat * (size * 0.0012) };
-  });
+  const placed = draw.map((car) => ({ car, ...carPose(sim, car, alpha, garages) }));
   const ends = spotlight.length === 2 ? spotlight.map((id) => placed.find((p) => p.car.id === id)) : [];
   const link = ends[0] && ends[1] ? ([ends[0], ends[1]] as const) : null;
 
@@ -299,13 +294,12 @@ export function TrackMap({ sim, selectedId, onSelect, alpha, showAllLabels, spot
         {link && (
           <line x1={link[0].x} y1={link[0].y} x2={link[1].x} y2={link[1].y} stroke="#e6e9f0" strokeWidth={r * 0.18} strokeDasharray={`${r * 0.5} ${r * 0.4}`} />
         )}
-        {placed.map(({ car, x, y }) => (
+        {placed.map(({ car, ...pose }) => (
           <Marker
             key={car.id}
             car={car}
             position={order.indexOf(car) + 1}
-            x={x}
-            y={y}
+            pose={pose}
             r={r}
             selected={car.id === selectedId}
             spot={spotlight.includes(car.id)}
