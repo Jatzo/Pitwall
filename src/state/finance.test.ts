@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { carOverall, defaultTeams } from '../data/teams.ts';
 import type { ScoredRow } from '../engine/scoring.ts';
-import { ECONOMY, salaryFor, settleRace, startingBalance } from './finance.ts';
+import { ECONOMY, roundLines, salaryFor, settleRace, startingBalance } from './finance.ts';
 import { parseSave } from './migrate.ts';
 import { newCareer, recordRace } from './season.ts';
 import type { Career } from './season.ts';
@@ -60,7 +60,7 @@ describe('money', () => {
     assert.equal(by(/^Repairs/), undefined, 'no repairs without a collision');
     const sum = lines.reduce((s, l) => s + l.amount, 0);
     assert.ok(Math.abs(after.finance.balance - (before + sum)) < 1e-9);
-    assert.deepEqual(after.finance.ledger.slice(0, lines.length), lines);
+    assert.deepEqual(after.finance.ledger.slice(0, lines.length), [...lines].reverse());
     for (const l of lines) assert.equal(l.round, 0);
   });
 
@@ -83,14 +83,19 @@ describe('money', () => {
     assert.ok(settleRace(career).career.finance.balance < 0);
   });
 
-  it('keeps the newest ledger lines and drops the oldest', () => {
+  it('keeps the newest rounds whole and drops the oldest', () => {
     let career = newCareer('aurora', teams, 5);
     for (let i = 0; i < 12; i++) {
+      // A purchase before the race makes each round longer than the race's own lines.
+      career = { ...career, finance: { ...career.finance, ledger: [{ season: 1, round: i, label: 'Upgrade: Aero', amount: -1 }, ...career.finance.ledger] } };
       career = raced(career, [row('aurora:0', 3, 15)]);
       career = settleRace(career).career;
     }
-    assert.equal(career.finance.ledger.length, ECONOMY.ledgerKeep);
-    assert.equal(career.finance.ledger[0].round, 11);
+    const rounds = [...new Set(career.finance.ledger.map((l) => l.round))];
+    assert.equal(rounds.length, ECONOMY.ledgerRounds);
+    assert.equal(rounds[0], 11);
+    // Every kept round still has all five of its lines.
+    for (const r of rounds) assert.equal(roundLines(career, 1, r).length, 5, `round ${r}`);
   });
 
   it('gives a save from before money existed its starting balance and contracts', () => {
@@ -111,5 +116,17 @@ describe('money', () => {
     assert.equal((again as { career: Career }).career.finance.balance, startingBalance(teams, career.playerTeamId));
     assert.deepEqual((again as { career: Career }).career.development, { gains: {}, projects: [], delivered: [] });
     assert.equal((again as { career: Career }).career.sponsor, null);
+  });
+
+  it("finds one round's money, purchases before the race included, oldest first", () => {
+    let c = newCareer('aurora', teams, 5);
+    c = settleRace(raced(c, [row('aurora:0', 3, 15)])).career;
+    const bought = { season: 1, round: 1, label: 'Upgrade: Aero', amount: -2 };
+    c = { ...c, finance: { ...c.finance, ledger: [bought, ...c.finance.ledger] } };
+    c = settleRace(raced(c, [row('aurora:0', 4, 12)])).career;
+    const lines = roundLines(c, 1, 1);
+    assert.equal(lines[0], bought);
+    assert.ok(lines.slice(1).every((l) => l.round === 1));
+    assert.equal(roundLines(c, 1, 0).length, 4);
   });
 });

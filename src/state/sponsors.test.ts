@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { carOverall, defaultTeams } from '../data/teams.ts';
 import { settleRace } from './finance.ts';
-import { chooseSponsor, describeObjective, objectiveMet, sponsorOffers } from './sponsors.ts';
+import { chooseSponsor, describeObjective, objectiveMet, sponsorOffers, sponsorRecord } from './sponsors.ts';
 import { newCareer, recordRace } from './season.ts';
 import type { Career, Objective, RaceRecordRow } from './season.ts';
 import type { ScoredRow } from '../engine/scoring.ts';
@@ -95,5 +95,20 @@ describe('sponsors', () => {
     assert.throws(() => chooseSponsor(signed, b));
     const next = { ...signed, season: 2 };
     assert.equal(chooseSponsor(next, sponsorOffers(next, teams)[0]).sponsor?.season, 2);
+  });
+
+  it("counts this season's races in which the objective was met", () => {
+    let c = newCareer('cobalt', teams, 3);
+    assert.equal(sponsorRecord(c), null);
+    c = chooseSponsor(c, { ...sponsorOffers(c, teams)[0], objective: { kind: 'bothFinish' } });
+    c = recordRace(c, 20, [scored(row('cobalt:0', 8)), scored(row('cobalt:1', 12))], teams);
+    c = recordRace(c, 20, [scored(row('cobalt:0', 8)), scored(row('cobalt:1', 20, 0, false))], teams);
+    assert.deepEqual(sponsorRecord(c), { met: 1, races: 2 });
+    assert.equal(sponsorRecord({ ...c, season: 2 }), null, 'a deal from last season has no record this season');
+    // Signed after a race: that race is not the sponsor's.
+    let late = recordRace(newCareer('cobalt', teams, 3), 20, [scored(row('cobalt:0', 8)), scored(row('cobalt:1', 12))], teams);
+    late = chooseSponsor(late, { ...sponsorOffers(late, teams)[0], objective: { kind: 'bothFinish' } });
+    late = recordRace(late, 20, [scored(row('cobalt:0', 8)), scored(row('cobalt:1', 20, 0, false))], teams);
+    assert.deepEqual(sponsorRecord(late), { met: 0, races: 1 });
   });
 });

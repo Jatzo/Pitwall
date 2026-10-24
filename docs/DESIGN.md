@@ -139,7 +139,6 @@ The player's two drivers talk on the team radio (`src/ui/radio.ts`). They react 
 ## Known limits
 
 - A race in progress is not saved; only completed rounds are.
-- No screen shows car development or sponsors yet; the season script plays them.
 - A midfield team that spends ends about one place higher than one that does not, where the economy aimed for two places up.
 - Qualifying is always dry; rain arrives only in the race.
 - Rival teams sometimes fit intermediates and then full wets a few laps later in a strengthening shower, because they only see the rain already falling.
@@ -148,8 +147,6 @@ The player's two drivers talk on the team radio (`src/ui/radio.ts`). They react 
 
 ## Roadmap
 
-1. Budget, R&D and car upgrades between rounds.
-2. Driver contracts, development and a transfer market.
-3. Sponsors and objectives.
-4. Replay from the command log, plus lap-time and tyre-wear charts.
-5. Wet qualifying.
+1. Driver contracts, development and a transfer market.
+2. Replay from the command log, plus lap-time and tyre-wear charts.
+3. Wet qualifying.

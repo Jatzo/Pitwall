@@ -6,9 +6,10 @@ import type { ScoredRow } from './engine/scoring.ts';
 import type { RaceConfig, RaceSim } from './engine/race.ts';
 import type { TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
-import { deliverProjects } from './state/development.ts';
+import { deliverProjects, startProject } from './state/development.ts';
 import { effectiveTeams } from './state/effectiveTeams.ts';
 import { settleRace } from './state/finance.ts';
+import { chooseSponsor } from './state/sponsors.ts';
 import { isSeasonOver, newCareer, recordRace } from './state/season.ts';
 import type { Career } from './state/season.ts';
 import { Calendar } from './ui/Calendar.tsx';
@@ -16,6 +17,7 @@ import { RaceScreen } from './ui/RaceScreen.tsx';
 import { ResultsScreen } from './ui/ResultsScreen.tsx';
 import { Standings } from './ui/Standings.tsx';
 import { TeamEditor } from './ui/TeamEditor.tsx';
+import { TeamHQ } from './ui/TeamHQ.tsx';
 import { TeamLogo } from './ui/TeamLogo.tsx';
 import { WeekendHub } from './ui/WeekendHub.tsx';
 import type { RaceSetup } from './ui/WeekendHub.tsx';
@@ -28,7 +30,8 @@ type Screen =
   | { name: 'results'; rows: ScoredRow[]; trackId: string; laps: number }
   | { name: 'season' }
   | { name: 'calendar'; back: 'hub' | 'season' }
-  | { name: 'teams' };
+  | { name: 'teams' }
+  | { name: 'hq' };
 
 function Menu({
   teams,
@@ -157,12 +160,16 @@ export function App() {
     setScreen({ name: 'race', config, key: Date.now() });
   };
 
+  // Every change to the career is saved at once: a finished race and every decision in Team HQ.
+  const commit = (next: Career) => {
+    setCareer(next);
+    saveCareer(next);
+  };
+
   const finishRace = (sim: RaceSim) => {
     if (!career) return;
     const rows = scoreRace(sim.results(), sim.fastestLap?.carId ?? null);
-    const next = deliverProjects(settleRace(recordRace(career, sim.totalLaps, rows, racing)).career).career;
-    setCareer(next);
-    saveCareer(next);
+    commit(deliverProjects(settleRace(recordRace(career, sim.totalLaps, rows, racing)).career).career);
     setScreen({ name: 'results', rows, trackId: sim.track.def.id, laps: sim.totalLaps });
   };
 
@@ -194,7 +201,13 @@ export function App() {
       break;
     case 'hub':
       body = career ? (
-        <WeekendHub career={career} teams={racing} onStart={startRace} onCalendar={() => setScreen({ name: 'calendar', back: 'hub' })} />
+        <WeekendHub
+          career={career}
+          teams={racing}
+          onStart={startRace}
+          onCalendar={() => setScreen({ name: 'calendar', back: 'hub' })}
+          onHQ={() => setScreen({ name: 'hq' })}
+        />
       ) : null;
       break;
     case 'race':
@@ -229,6 +242,18 @@ export function App() {
       body = career ? <Calendar career={career} teams={racing} onBack={() => setScreen(back === 'hub' ? { name: 'hub' } : { name: 'season' })} /> : null;
       break;
     }
+    case 'hq':
+      body = career ? (
+        <TeamHQ
+          career={career}
+          teams={racing}
+          editorTeams={teams}
+          onBuy={(area, kind) => commit(startProject(career, teams, area, kind))}
+          onSign={(deal) => commit(chooseSponsor(career, deal))}
+          onBack={() => setScreen({ name: 'hub' })}
+        />
+      ) : null;
+      break;
     case 'teams':
       body = (
         <TeamEditor

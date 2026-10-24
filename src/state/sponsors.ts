@@ -50,14 +50,22 @@ export function sponsorOffers(career: Career, teams: readonly TeamDef[]): Sponso
   return SPONSORS.tiers.map((t) => {
     const name = names.splice(Math.floor(rng.next() * names.length), 1)[0];
     const swing = rng.range(0.9, 1.1);
-    return { name, tier: t.tier, base: money(t.base * (1.15 - 0.3 * k) * swing), bonus: money(t.bonus * swing), objective: objectiveFor(t.tier, rank, ranked), season: career.season };
+    return { name, tier: t.tier, base: money(t.base * (1.15 - 0.3 * k) * swing), bonus: money(t.bonus * swing), objective: objectiveFor(t.tier, rank, ranked), season: career.season, fromRound: 0 };
   });
 }
 
 /** Signs a deal for the season. Throws if one is already signed this season; the screen offers only one choice. */
 export function chooseSponsor(career: Career, deal: SponsorDeal): Career {
   if (career.sponsor && career.sponsor.season === career.season) throw new Error(`Already sponsored by ${career.sponsor.name} this season`);
-  return { ...career, sponsor: { ...deal, season: career.season } };
+  return { ...career, sponsor: { ...deal, season: career.season, fromRound: career.results.length } };
+}
+
+/** This season's deal and how many of its races met the objective, or null with no deal this season. */
+export function sponsorRecord(career: Career): { met: number; races: number } | null {
+  const deal = career.sponsor;
+  if (!deal || deal.season !== career.season) return null;
+  const races = career.results.slice(deal.fromRound);
+  return { met: races.filter((r) => objectiveMet(deal.objective, r.rows, career.playerTeamId)).length, races: races.length };
 }
 
 export function objectiveMet(objective: Objective, rows: readonly RaceRecordRow[], playerTeamId: string): boolean {

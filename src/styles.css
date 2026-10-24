@@ -91,6 +91,7 @@ h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; lette
   border-left: 4px solid var(--accent); padding-left: 8px; margin-bottom: 10px; line-height: 1.2;
 }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid2.wide { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .editor-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; align-items: start; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
@@ -106,7 +107,10 @@ h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; lette
 .round-name { font-family: var(--display); font-size: 18px; font-weight: 700; }
 .pos-big { font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1; }
 .key-hint { opacity: 0.8; font-weight: 400; }
-@media (max-width: 900px) { .grid2, .grid3, .editor-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .grid2, .grid3, .editor-grid { grid-template-columns: 1fr; }
+  .grid2.wide { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 600px) { .page-title { font-size: 22px; } .hero h1 { font-size: 36px; } }
 
 /* ----- buttons ----- */
@@ -251,6 +255,20 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .stint > div { display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--ink); min-width: 0; }
 .warnbox { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); padding: 6px 8px; font-size: 12px; }
 .car-title { font-size: 18px; font-weight: 800; }
+
+/* ----- team HQ ----- */
+.scroll-x { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.hq-balance { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.hq-balance b { font-family: var(--display); font-size: 22px; font-weight: 700; }
+.hq-note { margin: -4px 0 10px; max-width: 70ch; }
+.hq-sub { display: block; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--faded); }
+.hq-dev td { vertical-align: middle; white-space: nowrap; }
+.hq-dev .btn.small { min-width: 7.5em; text-align: right; }
+.hq-building { color: var(--warn-ink); }
+.hq-h4 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.hq-round + .hq-round { border-top: 1px solid var(--line); margin-top: 10px; }
+.hq-round .hq-h4 { margin-top: 10px; }
+.hq-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
 
 /* ----- misc ----- */
 .hero { padding: 28px 0 6px; }

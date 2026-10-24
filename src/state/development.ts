@@ -55,6 +55,8 @@ export const DEVELOPMENT = {
 
 const money = (n: number): number => Math.round(n * 100) / 100;
 
+export const kindLabel = (kind: ProjectKind): string => DEVELOPMENT.kinds.find((k) => k.kind === kind)?.label ?? kind;
+
 export function emptyDevelopment(): Development {
   return { gains: {}, projects: [], delivered: [] };
 }

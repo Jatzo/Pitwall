@@ -25,7 +25,8 @@ export const ECONOMY = {
   /** A driver's salary per race, from the weakest to the strongest driver. */
   salaryMin: 0.1,
   salaryMax: 0.4,
-  ledgerKeep: 40,
+  /** Rounds of ledger kept, whole, so a round never shows only part of its money. */
+  ledgerRounds: 10,
 } as const;
 
 const money = (n: number): number => Math.round(n * 100) / 100;
@@ -57,6 +58,20 @@ export function startingMoney(teams: readonly TeamDef[], teamId: string): Pick<C
   };
 }
 
+/** One round's money in the order it was booked: purchases made before the race, then the race itself. */
+export function roundLines(career: Career, season: number, round: number): LedgerEntry[] {
+  return career.finance.ledger.filter((l) => l.season === season && l.round === round).reverse();
+}
+
+function keepRounds(ledger: LedgerEntry[]): LedgerEntry[] {
+  const kept = new Set<string>();
+  for (const l of ledger) {
+    kept.add(`${l.season}:${l.round}`);
+    if (kept.size === ECONOMY.ledgerRounds) break;
+  }
+  return ledger.filter((l) => kept.has(`${l.season}:${l.round}`));
+}
+
 /** Books the most recent race: returns the career with the new balance, and the race's ledger lines. */
 export function settleRace(career: Career): { career: Career; lines: LedgerEntry[] } {
   const race = career.results[career.results.length - 1];
@@ -77,7 +92,8 @@ export function settleRace(career: Career): { career: Career; lines: LedgerEntry
   if (collisions > 0) lines.push(line(collisions === 1 ? 'Repairs (one car)' : 'Repairs (both cars)', -ECONOMY.repair * collisions));
   const balance = money(career.finance.balance + lines.reduce((s, l) => s + l.amount, 0));
   return {
-    career: { ...career, finance: { balance, ledger: [...lines, ...career.finance.ledger].slice(0, ECONOMY.ledgerKeep) } },
+    // The ledger is newest first, line by line, so a round reads in booking order when reversed.
+    career: { ...career, finance: { balance, ledger: keepRounds([...[...lines].reverse(), ...career.finance.ledger]) } },
     lines,
   };
 }

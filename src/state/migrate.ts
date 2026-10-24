@@ -67,7 +67,7 @@ function withSections(raw: Raw, teams: readonly TeamDef[]): Raw | null {
 }
 
 function readSponsor(deal: unknown): boolean {
-  if (!isObject(deal) || typeof deal.name !== 'string' || typeof deal.base !== 'number' || typeof deal.bonus !== 'number' || !isInt(deal.season, 1)) return false;
+  if (!isObject(deal) || typeof deal.name !== 'string' || typeof deal.base !== 'number' || typeof deal.bonus !== 'number' || !isInt(deal.season, 1) || !isInt(deal.fromRound, 0)) return false;
   if (deal.tier !== 'safe' && deal.tier !== 'balanced' && deal.tier !== 'ambitious') return false;
   const o = deal.objective;
   if (!isObject(o)) return false;

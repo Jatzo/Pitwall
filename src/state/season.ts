@@ -95,6 +95,8 @@ export interface SponsorDeal {
   objective: Objective;
   /** The season the deal runs for. */
   season: number;
+  /** The round it was signed before; races before it are not the sponsor's. */
+  fromRound: number;
 }
 
 export interface Career {

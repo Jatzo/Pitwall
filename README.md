@@ -19,7 +19,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Deterministic design:** a separate seeded random stream for each purpose.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 315 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 319 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -30,6 +30,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Key moments pause the race**: when the safety car comes out, one of your cars is damaged, rain starts, or the conditions turn in favour of another tyre, the game stops and asks for your pit call (this can be turned off).
 - **Weather**: rain that comes and goes, a racing line that dries before the rest of the track, intermediate and full wet tyres, and a forecast with honest uncertainty, by quarter of the race before the start and in 5-minute steps during it. Rivals react to the rain they can see; the forecast is your edge.
 - **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, and a drivers' and constructors' championship over a ten-round season. Progress is saved in the browser; a season started before the calendar grew keeps its original four rounds.
+- **Team HQ** between races: a budget with each round's money itemised, car projects in five areas that take one to three rounds and can come in at half, and a sponsor to sign each season, whose objective pays a bonus in every race it is met. Rival teams develop their cars each round too.
 - **Ten fictional circuits**, each with its own problem: a fast power circuit, two street circuits where passing is hard, a tyre-eater, a 79-lap short track and more. A calendar screen shows each round's character and how your finished rounds went.
 
 ![The ten circuits](docs/circuits.svg)
