@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { formatGap, formatLap } from '../engine/format.ts';
 import { sessionBests } from '../engine/insights.ts';
 import type { CarState, RaceSim } from '../engine/race.ts';
@@ -9,7 +9,7 @@ interface Props {
   sim: RaceSim;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Changes whenever the timing should refresh. */
+  /** Moves on with the race screen's 180 ms refresh. The panel is memoised, so this prop is what redraws it: keep it. */
   tick: number;
 }
 
@@ -33,7 +33,7 @@ function statusText(car: CarState): string | null {
   return null;
 }
 
-export function TimingTower({ sim, selectedId, onSelect }: Props) {
+function TimingTowerView({ sim, selectedId, onSelect }: Props) {
   const [mode, setMode] = useState<'interval' | 'leader'>('interval');
   const order = sim.standings();
   const bests = sessionBests(sim);
@@ -119,3 +119,6 @@ export function TimingTower({ sim, selectedId, onSelect }: Props) {
     </div>
   );
 }
+
+/** Memoised: it redraws when `tick` moves on. */
+export const TimingTower = memo(TimingTowerView);

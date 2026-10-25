@@ -1,12 +1,14 @@
+import { memo } from 'react';
 import type { RaceSim } from '../engine/race.ts';
 
 interface Props {
   sim: RaceSim;
+  /** Moves on with the race screen's 180 ms refresh. The panel is memoised, so this prop is what redraws it: keep it. */
   tick: number;
   limit?: number;
 }
 
-export function EventFeed({ sim, limit = 40 }: Props) {
+function EventFeedView({ sim, limit = 40 }: Props) {
   const events = sim.events.slice(-limit).reverse();
   return (
     <div className="feed" aria-live="polite">
@@ -20,3 +22,6 @@ export function EventFeed({ sim, limit = 40 }: Props) {
     </div>
   );
 }
+
+/** Memoised: it redraws when `tick` moves on. */
+export const EventFeed = memo(EventFeedView);

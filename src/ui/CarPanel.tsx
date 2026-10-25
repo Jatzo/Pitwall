@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { formatGap, formatLap } from '../engine/format.ts';
 import { burnPerLap, fuelLapsSpare, rejoinEstimate, tyreLapsLeft, wearRatesFor } from '../engine/insights.ts';
 import type { CarState, RaceSim } from '../engine/race.ts';
@@ -12,6 +13,7 @@ import { cssVar } from './colour.ts';
 interface Props {
   sim: RaceSim;
   car: CarState;
+  /** Moves on with the race screen's 180 ms refresh. The panel is memoised, so this prop is what redraws it: keep it. */
   tick: number;
   dispatch: (cmd: RaceCommand) => void;
   /** Whether the camera is locked on this car. */
@@ -39,7 +41,7 @@ function Meter({ value, color, mark }: { value: number; color: string; mark?: nu
   );
 }
 
-export function CarPanel({ sim, car, dispatch, following, onFollow }: Props) {
+function CarPanelView({ sim, car, dispatch, following, onFollow }: Props) {
   const mine = car.isPlayer;
   const out = car.status === 'out' || car.status === 'finished';
   const wearPct = car.tyre.wear;
@@ -214,3 +216,6 @@ export function CarPanel({ sim, car, dispatch, following, onFollow }: Props) {
     </div>
   );
 }
+
+/** Memoised: it redraws when `tick` moves on. */
+export const CarPanel = memo(CarPanelView);

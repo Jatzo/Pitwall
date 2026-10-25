@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RaceSim } from '../engine/race.ts';
 import type { RaceConfig } from '../engine/race.ts';
 import type { RaceCommand } from '../engine/types.ts';
@@ -63,6 +63,8 @@ export function RaceScreen({ config, onFinish }: Props) {
   const [sim] = useState(() => new RaceSim(config));
   const [frame, setFrame] = useState(0);
   const [tick, setTick] = useState(0);
+  // Worked out once per refresh, so the memoised story strip redraws only when it changes.
+  const glanceNow = useMemo(() => glance(sim), [sim, tick]);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(4);
   const [labels, setLabels] = useState(false);
@@ -287,7 +289,7 @@ export function RaceScreen({ config, onFinish }: Props) {
           />
           {moment && <DecisionPrompt sim={sim} moment={moment} dispatch={dispatch} onResume={resume} />}
         </div>
-        {storiesOn && <StoryBanner story={storyRef.current} glance={glance(sim)} onSelect={setSelectedId} />}
+        {storiesOn && <StoryBanner story={storyRef.current} glance={glanceNow} onSelect={setSelectedId} />}
         <div className="race-lower">
           <div className="panel race-control">
             <h3>Race control</h3>

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Story } from './stories.ts';
 import { inkFor } from './colour.ts';
 
@@ -19,7 +20,7 @@ interface Props {
  * pointer shortcut only: a story lives a few seconds, too briefly to reach by
  * keyboard, and the timing tower selects cars from the keyboard already.
  */
-export function StoryBanner({ story, glance, onSelect }: Props) {
+function StoryBannerView({ story, glance, onSelect }: Props) {
   return (
     <div className="story-strip">
       {!story && (
@@ -61,3 +62,6 @@ export function StoryBanner({ story, glance, onSelect }: Props) {
     </div>
   );
 }
+
+/** Memoised: the strip redraws when its story or the glance changes. */
+export const StoryBanner = memo(StoryBannerView);
