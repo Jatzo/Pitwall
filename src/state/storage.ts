@@ -108,7 +108,7 @@ export function resetTeams(): TeamDef[] {
   try {
     window.localStorage.removeItem(TEAMS_KEY);
   } catch {
-    // ignore
+    // Storage unavailable (private mode): nothing was saved, so there is nothing to clear.
   }
   return defaultTeams();
 }
@@ -134,7 +134,7 @@ export function clearCareer(): void {
     window.localStorage.removeItem(CAREER_KEY);
     window.localStorage.removeItem(OLD_CAREER_KEY);
   } catch {
-    // ignore
+    // Storage unavailable (private mode): nothing was saved, so there is nothing to clear.
   }
   clearReplays();
 }

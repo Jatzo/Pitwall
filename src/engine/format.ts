@@ -17,12 +17,6 @@ export function formatGap(seconds: number | null): string {
   return `+${seconds.toFixed(3)}`;
 }
 
-/** Sector time, e.g. "28.412". */
-export function formatSector(seconds: number | null): string {
-  if (seconds === null || Number.isNaN(seconds)) return '--.---';
-  return seconds.toFixed(3);
-}
-
 /** Total race time, e.g. "1:24:36.512", or "33:07.424" under an hour. */
 export function formatRaceTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -30,10 +24,6 @@ export function formatRaceTime(seconds: number): string {
   const s = seconds - h * 3600 - m * 60;
   const rest = s.toFixed(3).padStart(6, '0');
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`;
-}
-
-export function mpsToKph(v: number): number {
-  return v * 3.6;
 }
 
 /** 1st, 2nd, 3rd, 4th, 11th, 21st. */

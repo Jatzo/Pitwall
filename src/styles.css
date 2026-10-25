@@ -96,7 +96,6 @@ h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; lette
 }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .grid2.wide { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
-.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .editor-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; align-items: start; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
 /* The player's orders sit in a fieldset so a replay can lock them all at once. */
@@ -115,7 +114,7 @@ h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; lette
 .pos-big { font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1; }
 .key-hint { opacity: 0.8; font-weight: 400; }
 @media (max-width: 900px) {
-  .grid2, .grid3, .editor-grid { grid-template-columns: 1fr; }
+  .grid2, .editor-grid { grid-template-columns: 1fr; }
   .grid2.wide { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 600px) { .page-title { font-size: 22px; } .hero h1 { font-size: 36px; } }
@@ -319,7 +318,6 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .trackinfo div { display: flex; flex-direction: column; }
 .trackinfo b { font-family: var(--mono); font-size: 16px; }
 .trackinfo span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.chequer { display: inline-block; width: 12px; height: 12px; background: conic-gradient(var(--white) 25%, var(--ink) 0 50%, var(--white) 0 75%, var(--ink) 0); background-size: 6px 6px; }
 
 /* ----- decision prompt ----- */
 .decision {

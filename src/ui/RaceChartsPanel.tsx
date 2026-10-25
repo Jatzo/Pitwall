@@ -151,8 +151,12 @@ function LineChart({ title, series, totalLaps, value, domain, format, safetyCarL
   );
 }
 
+interface Props {
+  charts: RaceCharts;
+}
+
 /** Lap times and tyre wear from the race just finished. The race's own laps, so nothing is saved. */
-export function RaceChartsPanel({ charts }: { charts: RaceCharts }) {
+export function RaceChartsPanel({ charts }: Props) {
   const maxWear = Math.max(1, ...charts.wearSeries.flatMap((s) => s.laps.map((l) => l.wear)));
   const wearTop = Math.ceil(maxWear * 10) / 10;
   return (

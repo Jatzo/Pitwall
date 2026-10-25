@@ -1,7 +1,8 @@
 /**
- * Every balance knob for the race simulation lives here, so tuning the game is
- * a one-file change. Values are checked with `npm run calibrate` over 300
- * full-distance races; the measured results are listed in docs/DESIGN.md.
+ * The calibrated balance knobs for the race simulation live here; event odds
+ * and AI thresholds sit beside the code that uses them. Values are checked with
+ * `npm run calibrate` over 300 full-distance races; the measured results are
+ * listed in docs/DESIGN.md.
  */
 import type { Difficulty } from './types.ts';
 

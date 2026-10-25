@@ -41,14 +41,7 @@ type Screen =
   | { name: 'teams' }
   | { name: 'hq' };
 
-function Menu({
-  teams,
-  career,
-  saveProblem,
-  onNew,
-  onContinue,
-  onTeams,
-}: {
+interface MenuProps {
   teams: TeamDef[];
   career: Career | null;
   /** Why the saved season could not be read, if it could not. */
@@ -56,7 +49,9 @@ function Menu({
   onNew: (teamId: string, difficulty: Difficulty) => void;
   onContinue: () => void;
   onTeams: () => void;
-}) {
+}
+
+function Menu({ teams, career, saveProblem, onNew, onContinue, onTeams }: MenuProps) {
   const [pick, setPick] = useState(teams[0].id);
   const [level, setLevel] = useState<Difficulty>('medium');
   const savedTeam = career ? teams.find((t) => t.id === career.playerTeamId) : undefined;
