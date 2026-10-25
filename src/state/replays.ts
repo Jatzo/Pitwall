@@ -10,7 +10,7 @@ import { trackById } from '../data/tracks.ts';
 import type { RaceConfig, RaceSim } from '../engine/race.ts';
 import { replayRace } from '../engine/replay.ts';
 import type { CommandLog } from '../engine/replay.ts';
-import type { StrategyPlan, TeamDef } from '../engine/types.ts';
+import type { Difficulty, StrategyPlan, TeamDef } from '../engine/types.ts';
 import type { WeatherTimeline } from '../engine/weather.ts';
 import type { Career } from './season.ts';
 
@@ -27,6 +27,8 @@ export interface ReplayRecord {
   playerTeamId: string | null;
   strategies?: Record<string, StrategyPlan>;
   weather?: WeatherTimeline;
+  /** Absent in replays kept before difficulty existed, which all ran on Medium. */
+  difficulty?: Difficulty;
   /** The teams as they raced, without uploaded logo images, which can be large. */
   teams: TeamDef[];
   commands: CommandLog;
@@ -94,6 +96,7 @@ export function replayRecord(config: RaceConfig, sim: RaceSim, round: number): R
     playerTeamId: config.playerTeamId,
     strategies: config.strategies,
     weather: config.weather,
+    difficulty: config.difficulty,
     teams: config.teams.map((t) => ({ ...t, logo: { shape: t.logo.shape, initials: t.logo.initials } })),
     commands: sim.commandLog,
     order: sim.results().map((r) => r.carId),
@@ -144,6 +147,7 @@ export function replayConfig(record: ReplayRecord, editorTeams: readonly TeamDef
     playerTeamId: record.playerTeamId,
     strategies: record.strategies,
     weather: record.weather,
+    difficulty: record.difficulty,
   };
 }
 

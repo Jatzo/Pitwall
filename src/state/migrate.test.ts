@@ -61,6 +61,15 @@ describe('save migration', () => {
     assert.deepEqual(again.results, migrated.results);
   });
 
+  it('reads a save from before difficulty as Medium, and keeps a chosen level', () => {
+    const migrated = okCareer(parseSave(null, v1Text, teams));
+    assert.equal(migrated.difficulty, 'medium');
+    const older: Partial<typeof migrated> = { ...migrated };
+    delete older.difficulty;
+    assert.equal(okCareer(parseSave(JSON.stringify(older), null, teams)).difficulty, 'medium');
+    assert.equal(okCareer(parseSave(JSON.stringify({ ...migrated, difficulty: 'hard' }), null, teams)).difficulty, 'hard');
+  });
+
   it('refuses a save made by a newer version, so it is never overwritten without asking', () => {
     const newer = JSON.stringify({ ...v1, version: 3 });
     const result = parseSave(newer, null, teams);
@@ -74,7 +83,7 @@ describe('save migration', () => {
   });
 
   it('refuses broken data rather than starting over quietly', () => {
-    for (const text of ['{not json', '42', '{"version":1}', JSON.stringify({ ...v1, results: 'x' }), JSON.stringify({ ...v1, results: [{ rows: [{ carId: 5 }] }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], finance: { balance: 'lots', ledger: [] } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], drivers: [{ driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }, { driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], development: { gains: { wings: 3 }, projects: [], delivered: [] } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], sponsor: { name: 'X', tier: 'safe', base: 1, bonus: 1, season: 1, fromRound: 0, objective: { kind: 'topN', n: 0 } } })]) {
+    for (const text of ['{not json', '42', '{"version":1}', JSON.stringify({ ...v1, results: 'x' }), JSON.stringify({ ...v1, results: [{ rows: [{ carId: 5 }] }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], finance: { balance: 'lots', ledger: [] } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], drivers: [{ driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }, { driverId: 'aurora-0', salary: 0.3, seasonsLeft: 1 }] }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], development: { gains: { wings: 3 }, projects: [], delivered: [] } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], sponsor: { name: 'X', tier: 'safe', base: 1, bonus: 1, season: 1, fromRound: 0, objective: { kind: 'topN', n: 0 } } }), JSON.stringify({ ...v1, version: 2, season: 1, roundsBefore: 0, results: [], difficulty: 'brutal' })]) {
       assert.equal(parseSave(null, text, teams).status, 'unreadable', text.slice(0, 40));
     }
   });

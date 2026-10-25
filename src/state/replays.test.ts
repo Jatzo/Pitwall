@@ -118,6 +118,20 @@ describe('replays', () => {
     assert.equal(checkReplay(replayConfig(tampered, teams), tampered), false);
   });
 
+  it('keep the difficulty, so a Hard race plays back as it was run', () => {
+    const track = TRACKS[0];
+    const config: RaceConfig = { track, teams, grid: runQualifying(track, teams, 8).grid, laps: 25, seed: 8, playerTeamId: 'cobalt', difficulty: 'hard' };
+    const sim = new RaceSim(config);
+    sim.start();
+    const feed = new CommandFeed(sim, []);
+    while (sim.phase !== 'finished') feed.step(STEP_S);
+    const record = replayRecord(config, sim, 0);
+    const played = replayConfig(JSON.parse(JSON.stringify(record)), teams);
+    assert.equal(played.difficulty, 'hard');
+    assert.equal(checkReplay(played, record), true);
+    assert.equal(checkReplay({ ...played, difficulty: 'easy' }, record), false);
+  });
+
   it('keep a 25-lap race with its commands under 20 KB', () => {
     const { config, sim } = raced();
     const size = JSON.stringify(replayRecord(config, sim, 0)).length;

@@ -19,6 +19,7 @@ import { TeamLogo } from './TeamLogo.tsx';
 import { TrackOutline } from './TrackOutline.tsx';
 import { cssVar } from './colour.ts';
 import { formatMoney } from './money.ts';
+import { difficultyName } from './difficulty.ts';
 
 export interface RaceSetup {
   trackId: string;
@@ -82,7 +83,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar, onHQ }: Props) 
   const byId = new Map<string, { team: TeamDef; name: string }>();
   for (const team of teams) team.drivers.forEach((d, i) => byId.set(`${team.id}:${i}`, { team, name: d.name }));
 
-  const runQuali = () => setQuali(runQualifying(trackDef, teams, seed));
+  const runQuali = () => setQuali(runQualifying(trackDef, teams, seed, { playerTeamId: career.playerTeamId, difficulty: career.difficulty }));
 
   const start = () => {
     if (!quali) return;
@@ -94,7 +95,7 @@ export function WeekendHub({ career, teams, onStart, onCalendar, onHQ }: Props) 
       <div className="row wrap">
         <div style={{ flex: 1 }}>
           <div className="muted label-caps">
-            Round {round + 1} of {career.calendar.length}
+            Round {round + 1} of {career.calendar.length} · {difficultyName(career.difficulty)}
           </div>
           <h2 className="page-title">{trackDef.name}</h2>
           <div className="muted">{trackDef.location}</div>

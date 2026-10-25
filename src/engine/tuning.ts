@@ -3,6 +3,8 @@
  * a one-file change. Values are checked with `npm run calibrate` over 300
  * full-distance races; the measured results are listed in docs/DESIGN.md.
  */
+import type { Difficulty } from './types.ts';
+
 export const TUNING = {
   /** Lap-time cost per missing point of car rating (out of 100). */
   carSecPerPoint: 0.07,
@@ -73,3 +75,25 @@ export const TUNING = {
   /** Penalty if a dry race is finished on a single compound. */
   compoundRulePenalty: 30,
 } as const;
+
+export interface DifficultyLevel {
+  /** Seconds a lap added to every rival car; negative makes them quicker. */
+  rivalPace: number;
+  /** Multiplies `aiStrategyJitter` for rival teams: more noise, worse plans. */
+  planJitter: number;
+  /** Laps either side of its plan a rival's stops may move. */
+  stopSpread: number;
+  /**
+   * The range each rival's margin for a weather stop is drawn from. A rival
+   * stops once the time it expects to gain beats the pit loss times this, so
+   * 1 is the break-even point.
+   */
+  weatherCaution: readonly [number, number];
+}
+
+/** Medium is the game as tuned above; a Medium race is the race the game ran before difficulty existed. */
+export const DIFFICULTY: Readonly<Record<Difficulty, DifficultyLevel>> = {
+  easy: { rivalPace: 0.75, planJitter: 1, stopSpread: 3, weatherCaution: [1.1, 2.2] },
+  medium: { rivalPace: 0, planJitter: 1, stopSpread: 3, weatherCaution: [0.5, 1.3] },
+  hard: { rivalPace: -0.4, planJitter: 0, stopSpread: 3, weatherCaution: [0.9, 1.1] },
+};

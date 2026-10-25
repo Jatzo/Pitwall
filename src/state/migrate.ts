@@ -63,7 +63,9 @@ function withSections(raw: Raw, teams: readonly TeamDef[]): Raw | null {
   if (!readDevelopment(development)) return null;
   const sponsor = raw.sponsor ?? null;
   if (sponsor !== null && !readSponsor(sponsor)) return null;
-  return { ...raw, finance, drivers, development, sponsor };
+  const difficulty = raw.difficulty ?? 'medium';
+  if (difficulty !== 'easy' && difficulty !== 'medium' && difficulty !== 'hard') return null;
+  return { ...raw, finance, drivers, development, sponsor, difficulty };
 }
 
 function readSponsor(deal: unknown): boolean {

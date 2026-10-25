@@ -27,7 +27,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Game economy:** whole careers played headless, spending against not spending, and the money tuned to what they showed.
 - **State and saves:** versioned saves. A milestone 4 save moves up once and stays as a backup, and a save the game cannot read is reported on the menu and kept until the player chooses to replace it.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 344 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 352 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -42,6 +42,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Ten fictional circuits**, each with its own problem: a fast power circuit, two street circuits where passing is hard, a tyre-eater, a 79-lap short track and more. A calendar screen shows each round's character and how your finished rounds went.
 
 ![The ten circuits](docs/circuits.svg)
+- **Difficulty**: Easy, Medium or Hard, picked for each career. It sets how quick the rival teams are and how well they call their pit stops; your own cars are the same on every level.
 - **Speed control** from 1x to 32x, pause, and skip to the flag.
 
 ## The simulation

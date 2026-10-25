@@ -8,7 +8,8 @@ import { TUNING, carId, raceForm } from './race.ts';
 import { Track } from './track.ts';
 import type { TrackDef } from './track.ts';
 import { COMPOUNDS } from './tyres.ts';
-import type { TeamDef } from './types.ts';
+import { DIFFICULTY } from './tuning.ts';
+import type { Difficulty, TeamDef } from './types.ts';
 
 export interface QualifyingRow {
   carId: string;
@@ -34,9 +35,15 @@ const QUALI_FUEL_KG = 6;
  * qualifying, the rest is the session's own luck, and each team gets a
  * qualifying-only factor for how well its car suits the session.
  */
-export function runQualifying(track: TrackDef, teams: readonly TeamDef[], seed: number): QualifyingResult {
+export function runQualifying(
+  track: TrackDef,
+  teams: readonly TeamDef[],
+  seed: number,
+  opts: { playerTeamId?: string | null; difficulty?: Difficulty } = {},
+): QualifyingResult {
   const geom = new Track(track);
   const w = track.weights;
+  const rivalPace = DIFFICULTY[opts.difficulty ?? 'medium'].rivalPace;
 
   interface Entrant {
     id: string;
@@ -52,6 +59,7 @@ export function runQualifying(track: TrackDef, teams: readonly TeamDef[], seed: 
   for (const team of teams) {
     const perf = team.car.power * w.power + team.car.aero * w.aero + team.car.chassis * w.chassis;
     const session = new Rng(mixSeed(seed, `quali-team:${team.id}`)).normal(0, TUNING.qualiTeamSigma);
+    const rival = team.id === opts.playerTeamId ? 0 : rivalPace;
     team.drivers.forEach((driver, i) => {
       const id = carId(team, i as 0 | 1);
       entrants.push({
@@ -65,7 +73,8 @@ export function runQualifying(track: TrackDef, teams: readonly TeamDef[], seed: 
           TUNING.engineMode.rich.pace +
           TUNING.qualiFormShare * raceForm(seed, id) +
           Math.sqrt(1 - TUNING.qualiFormShare ** 2) * new Rng(mixSeed(seed, `quali-form:${id}`)).normal(0, TUNING.formSigma) +
-          session,
+          session +
+          rival,
         sigma: 0.07 + (100 - driver.ratings.consistency) * 0.006,
         q1: null,
         q2: null,

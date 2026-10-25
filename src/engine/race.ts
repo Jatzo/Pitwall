@@ -16,13 +16,15 @@ import { jitterStops, planStrategy } from './strategy.ts';
 import type { PlanContext, WearRates } from './strategy.ts';
 import { Track } from './track.ts';
 import type { TrackDef } from './track.ts';
-import { TUNING } from './tuning.ts';
+import { DIFFICULTY, TUNING } from './tuning.ts';
+import type { DifficultyLevel } from './tuning.ts';
 import { COMPOUNDS, bestClass, scaledWearRates, tyreClass, tyrePenalty, weatherPenalty, wetWearFactor } from './tyres.ts';
 import type { TyreClass } from './tyres.ts';
 import { DRY_WEATHER, RAIN_THRESHOLD, rainAt } from './weather.ts';
 import type { WeatherTimeline } from './weather.ts';
 import type {
   Compound,
+  Difficulty,
   DriverDef,
   EngineMode,
   PaceMode,
@@ -173,6 +175,8 @@ export interface RaceConfig {
   strategies?: Record<string, StrategyPlan>;
   /** The race's rain. Absent means a dry race. */
   weather?: WeatherTimeline;
+  /** How hard the rival teams are. Absent means Medium. */
+  difficulty?: Difficulty;
 }
 
 export interface ResultRow {
@@ -267,6 +271,8 @@ function crossed(a: number, b: number, line: number): boolean {
 
 export class RaceSim {
   readonly cfg: RaceConfig;
+  /** What the difficulty changes for rival cars. */
+  private readonly level: DifficultyLevel;
   readonly track: Track;
   readonly totalLaps: number;
   readonly cars: CarState[];
@@ -297,6 +303,7 @@ export class RaceSim {
 
   constructor(cfg: RaceConfig) {
     this.cfg = cfg;
+    this.level = DIFFICULTY[cfg.difficulty ?? 'medium'];
     this.track = new Track(cfg.track);
     this.totalLaps = cfg.laps;
     this.eventRng = new Rng(mixSeed(cfg.seed, 'race-control'));
@@ -382,7 +389,7 @@ export class RaceSim {
       passCooldown: 0,
       reaction: 0.3,
       // A separate stream, so dry races draw exactly what they always drew.
-      weatherCaution: new Rng(mixSeed(cfg.seed, `${id}:weather`)).range(0.5, 1.3),
+      weatherCaution: new Rng(mixSeed(cfg.seed, `${id}:weather`)).range(...(isPlayer ? DIFFICULTY.medium : this.level).weatherCaution),
       weatherStopLap: -99,
       finishTime: null,
       penaltySeconds: 0,
@@ -390,7 +397,7 @@ export class RaceSim {
       outLap: null,
       ahead: null,
       aheadGap: Infinity,
-      carDelta: (100 - perf) * TUNING.carSecPerPoint + form,
+      carDelta: (100 - perf) * TUNING.carSecPerPoint + form + (isPlayer ? 0 : this.level.rivalPace),
       driverDelta: (100 - driver.ratings.pace) * TUNING.driverSecPerPoint,
       wearFactor,
       failureRate,
@@ -405,8 +412,8 @@ export class RaceSim {
       plan = preset;
     } else {
       const ctx = this.planContext(car, null, 0);
-      plan = planStrategy(isPlayer ? ctx : { ...ctx, jitter: { rng, seconds: TUNING.aiStrategyJitter } });
-      if (!isPlayer) plan = jitterStops(plan, rng, 3, 4, this.totalLaps - 3);
+      plan = planStrategy(isPlayer ? ctx : { ...ctx, jitter: { rng, seconds: TUNING.aiStrategyJitter * this.level.planJitter } });
+      if (!isPlayer) plan = jitterStops(plan, rng, this.level.stopSpread, 4, this.totalLaps - 3);
       const startClass = this.wetness > 0 ? bestClass(this.wetness) : 'slick';
       if (startClass !== 'slick') plan = { startCompound: startClass === 'inter' ? 'I' : 'W', stops: [] };
     }
@@ -991,7 +998,7 @@ export class RaceSim {
     } else {
       const ctx = this.planContext(car, ps.compound, 0);
       car.plan = planStrategy(
-        car.isPlayer ? ctx : { ...ctx, jitter: { rng: car.rng, seconds: TUNING.aiStrategyJitter / 2 } },
+        car.isPlayer ? ctx : { ...ctx, jitter: { rng: car.rng, seconds: (TUNING.aiStrategyJitter / 2) * this.level.planJitter } },
       );
     }
   }

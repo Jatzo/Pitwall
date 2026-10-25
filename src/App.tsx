@@ -5,7 +5,7 @@ import { scoreRace } from './engine/scoring.ts';
 import type { ScoredRow } from './engine/scoring.ts';
 import type { RaceConfig, RaceSim } from './engine/race.ts';
 import type { CommandLog } from './engine/replay.ts';
-import type { TeamDef } from './engine/types.ts';
+import type { Difficulty, TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
 import { checkReplay, clearReplays, loadReplay, replayConfig, replayRecord, replayRounds, saveReplay } from './state/replays.ts';
 import { deliverProjects, startProject } from './state/development.ts';
@@ -27,6 +27,7 @@ import { TeamLogo } from './ui/TeamLogo.tsx';
 import { WeekendHub } from './ui/WeekendHub.tsx';
 import type { RaceSetup } from './ui/WeekendHub.tsx';
 import { cssVar } from './ui/colour.ts';
+import { DIFFICULTY_LEVELS, difficultyName } from './ui/difficulty.ts';
 import jatzoMark from './assets/jatzo-mark.png';
 
 type Screen =
@@ -52,11 +53,12 @@ function Menu({
   career: Career | null;
   /** Why the saved season could not be read, if it could not. */
   saveProblem: string | null;
-  onNew: (teamId: string) => void;
+  onNew: (teamId: string, difficulty: Difficulty) => void;
   onContinue: () => void;
   onTeams: () => void;
 }) {
   const [pick, setPick] = useState(teams[0].id);
+  const [level, setLevel] = useState<Difficulty>('medium');
   const savedTeam = career ? teams.find((t) => t.id === career.playerTeamId) : undefined;
   return (
     <div className="page stack">
@@ -79,7 +81,9 @@ function Menu({
           <TeamLogo team={savedTeam} size={36} />
           <div style={{ flex: 1 }}>
             <b>Season in progress: {savedTeam.name}</b>
-            <div className="muted">{career.results.length} of {career.calendar.length} rounds completed</div>
+            <div className="muted">
+              {career.results.length} of {career.calendar.length} rounds completed · {difficultyName(career.difficulty)}
+            </div>
           </div>
           <button className="btn primary" onClick={onContinue}>Continue season</button>
         </div>
@@ -117,13 +121,26 @@ function Menu({
           );
         })}
       </div>
+      <div className="stack" style={{ gap: 6 }}>
+        <div className="row wrap">
+          <span className="muted">Difficulty</span>
+          <span className="btn-group" role="group" aria-label="Difficulty">
+            {DIFFICULTY_LEVELS.map((l) => (
+              <button key={l.id} className={`btn small ${level === l.id ? 'active' : ''}`} aria-pressed={level === l.id} onClick={() => setLevel(l.id)}>
+                {l.name}
+              </button>
+            ))}
+          </span>
+        </div>
+        <div className="muted small">Sets how quick the rival teams are and how well they call their pit stops. Your own cars are the same on every level, and the choice is fixed for the career.</div>
+      </div>
       <div>
         <button
           className="btn primary"
           style={{ padding: '10px 18px' }}
           onClick={() => {
             if ((career || saveProblem) && !window.confirm('Starting a new season will replace your saved progress. Continue?')) return;
-            onNew(pick);
+            onNew(pick, level);
           }}
         >
           Start new season
@@ -178,6 +195,7 @@ export function App() {
       playerTeamId: career.playerTeamId,
       strategies: setup.plans,
       weather: setup.weather,
+      difficulty: career.difficulty,
     };
     setScreen({ name: 'race', config, key: Date.now() });
   };
@@ -224,10 +242,10 @@ export function App() {
           teams={teams}
           career={career}
           saveProblem={saveProblem}
-          onNew={(teamId) => {
+          onNew={(teamId, difficulty) => {
             clearCareer();
             setSaveProblem(null);
-            const c = newCareer(teamId, teams);
+            const c = newCareer(teamId, teams, undefined, difficulty);
             saveCareer(c);
             setCareer(c);
             setScreen({ name: 'hub' });

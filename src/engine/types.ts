@@ -6,6 +6,8 @@ export type DryCompound = 'S' | 'M' | 'H';
 export type Compound = DryCompound | 'I' | 'W';
 export type PaceMode = 'push' | 'standard' | 'conserve';
 export type EngineMode = 'rich' | 'standard' | 'lean';
+/** How hard the rival teams are to beat. It changes their pace and their pit-wall calls, never the player's cars. */
+export type Difficulty = 'easy' | 'medium' | 'hard';
 
 /** All ratings are 0-100. */
 export interface DriverRatings {

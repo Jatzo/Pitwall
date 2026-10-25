@@ -5,7 +5,7 @@
 
 import { SEASON_CALENDAR } from '../data/tracks.ts';
 import type { ScoredRow } from '../engine/scoring.ts';
-import type { CarRatings, TeamDef } from '../engine/types.ts';
+import type { CarRatings, Difficulty, TeamDef } from '../engine/types.ts';
 import { emptyDevelopment } from './development.ts';
 import { startingMoney } from './finance.ts';
 
@@ -118,12 +118,19 @@ export interface Career {
   development: Development;
   /** This season's sponsor, or null until one is signed. A deal from an earlier season pays nothing. */
   sponsor: SponsorDeal | null;
+  /** How hard the rival teams are, chosen when the career starts. */
+  difficulty: Difficulty;
 }
 
 export const CALENDAR: readonly string[] = SEASON_CALENDAR;
 
-export function newCareer(playerTeamId: string, teams: readonly TeamDef[], seed = Math.floor(Math.random() * 2 ** 31)): Career {
-  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId), development: emptyDevelopment(), sponsor: null };
+export function newCareer(
+  playerTeamId: string,
+  teams: readonly TeamDef[],
+  seed = Math.floor(Math.random() * 2 ** 31),
+  difficulty: Difficulty = 'medium',
+): Career {
+  return { version: 2, seed, playerTeamId, calendar: [...CALENDAR], results: [], season: 1, roundsBefore: 0, ...startingMoney(teams, playerTeamId), development: emptyDevelopment(), sponsor: null, difficulty };
 }
 
 /** Index of the next race to run (equals the number of races completed). */
