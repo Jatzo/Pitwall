@@ -8,20 +8,26 @@ Everything in it is fictional (teams, drivers, circuits), and everything is edit
 
 ![Race screen](docs/screenshots/race.png)
 
-| Weekend planning | Results | Team editor |
+| Weekend planning | Results | Team HQ |
 | --- | --- | --- |
-| ![Weekend](docs/screenshots/weekend.png) | ![Results](docs/screenshots/results.png) | ![Editor](docs/screenshots/team-editor.png) |
+| ![Weekend](docs/screenshots/weekend.png) | ![Results](docs/screenshots/results.png) | ![Team HQ](docs/screenshots/team-hq.png) |
+| **Season end** | **Team editor** | |
+| ![Season end](docs/screenshots/season-end.png) | ![Editor](docs/screenshots/team-editor.png) | |
+
+The careers in these screenshots were played headless with the game's own engine, then opened in the game.
 
 ## What this project shows
 
-Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells nine problems as seen, measured, changed and result.
+Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells eleven problems as seen, measured, changed and result.
 
 - **Modelling and algorithms:** circuits built from real corner radii, tyre wear, weather, strategy search, 10 m checkpoint gap timing.
 - **Probability:** a Bayesian rain forecast, checked over 2,000 races per race length.
 - **Deterministic design:** a separate seeded random stream for each purpose.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
+- **Game economy:** whole careers played headless, spending against not spending, and the money tuned to what they showed.
+- **State and saves:** versioned saves. A milestone 4 save moves up once and stays as a backup, and a save the game cannot read is reported on the menu and kept until the player chooses to replace it.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 327 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 329 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -77,9 +83,9 @@ Pushing to `main` runs tests and the build, then deploys `dist/` to GitHub Pages
 ```
 src/engine/   simulation (no UI imports): track, tyres, race, strategy, qualifying, scoring
 src/data/     fictional teams, drivers and circuits
-src/state/    season, standings and localStorage persistence
+src/state/    seasons, standings, saves and their migration, money, car development, sponsors, contracts
 src/ui/       React components: track map, timing tower, pit wall, hub, results, team editor
-scripts/      headless race runner and circuit inspector
+scripts/      headless race runner, calibration, season balance and circuit inspector
 ```
 
 ## Tech
@@ -88,4 +94,4 @@ TypeScript (strict), React 19, Vite 7, Node's built-in test runner, ESLint 9, Gi
 
 ## Status
 
-The core loop (strategy, qualifying, race, standings) over a ten-round calendar is playable. Planned next: R&D and budget, driver contracts and sponsors. All names are invented and not affiliated with any real championship.
+Ten-round seasons, one after another, are playable: strategy, qualifying, the race and the standings, with a budget, car development, a sponsor and driver contracts between races. Planned next: drivers who develop, and a transfer market in which rival teams sign drivers too. All names are invented and not affiliated with any real championship.

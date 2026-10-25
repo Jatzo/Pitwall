@@ -135,7 +135,7 @@ The player's two drivers talk on the team radio (`src/ui/radio.ts`). They react 
 
 ## Testing
 
-`node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), and season standings.
+`node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), season standings, and the management layer: save migration from a real milestone 4 save, money, car development and rival progress, sponsors and their objectives, contracts and the change of season.
 
 ## Known limits
 
