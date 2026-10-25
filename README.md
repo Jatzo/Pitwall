@@ -27,7 +27,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Game economy:** whole careers played headless, spending against not spending, and the money tuned to what they showed.
 - **State and saves:** versioned saves. A milestone 4 save moves up once and stays as a backup, and a save the game cannot read is reported on the menu and kept until the player chooses to replace it.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 329 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **Testing and CI:** 344 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -37,7 +37,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Pit wall** for your two cars: pace and engine modes, pit-now with compound choice and a projected rejoin position, an editable stop plan with tyre-wear forecasts and warnings, tyre-life and fuel-margin estimates, and an optional AI race engineer.
 - **Key moments pause the race**: when the safety car comes out, one of your cars is damaged, rain starts, or the conditions turn in favour of another tyre, the game stops and asks for your pit call (this can be turned off).
 - **Weather**: rain that comes and goes, a racing line that dries before the rest of the track, intermediate and full wet tyres, and a forecast with honest uncertainty, by quarter of the race before the start and in 5-minute steps during it. Rivals react to the rain they can see; the forecast is your edge.
-- **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, and a drivers' and constructors' championship over ten-round seasons, one after another. Progress is saved in the browser; a season started before the calendar grew keeps its original four rounds.
+- **Weekend flow**: Q1/Q2/Q3 knockout qualifying, strategy planning, the race, classification with points, lap-time and tyre-wear charts, replays of the season's races, and a drivers' and constructors' championship over ten-round seasons, one after another. Progress is saved in the browser; a season started before the calendar grew keeps its original four rounds.
 - **Team HQ** between races: a budget with each round's money itemised, car projects in five areas that take one to three rounds and can come in at half, and a sponsor to sign each season, whose objective pays a bonus in every race it is met. Rival teams develop their cars each round too. When a driver's contract ends, re-sign them at a salary that follows their points or sign one of eight fictional free agents.
 - **Ten fictional circuits**, each with its own problem: a fast power circuit, two street circuits where passing is hard, a tyre-eater, a 79-lap short track and more. A calendar screen shows each round's character and how your finished rounds went.
 

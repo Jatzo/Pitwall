@@ -4,8 +4,10 @@ import { carOverall } from './data/teams.ts';
 import { scoreRace } from './engine/scoring.ts';
 import type { ScoredRow } from './engine/scoring.ts';
 import type { RaceConfig, RaceSim } from './engine/race.ts';
+import type { CommandLog } from './engine/replay.ts';
 import type { TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
+import { checkReplay, clearReplays, loadReplay, replayConfig, replayRecord, replayRounds, saveReplay } from './state/replays.ts';
 import { deliverProjects, startProject } from './state/development.ts';
 import { effectiveTeams } from './state/effectiveTeams.ts';
 import { settleRace } from './state/finance.ts';
@@ -16,6 +18,8 @@ import type { Career } from './state/season.ts';
 import { Calendar } from './ui/Calendar.tsx';
 import { RaceScreen } from './ui/RaceScreen.tsx';
 import { ResultsScreen } from './ui/ResultsScreen.tsx';
+import { raceCharts } from './ui/raceCharts.ts';
+import type { RaceCharts } from './ui/raceCharts.ts';
 import { SeasonEnd } from './ui/SeasonEnd.tsx';
 import { TeamEditor } from './ui/TeamEditor.tsx';
 import { TeamHQ } from './ui/TeamHQ.tsx';
@@ -29,7 +33,8 @@ type Screen =
   | { name: 'menu' }
   | { name: 'hub' }
   | { name: 'race'; config: RaceConfig; key: number }
-  | { name: 'results'; rows: ScoredRow[]; trackId: string; laps: number }
+  | { name: 'results'; rows: ScoredRow[]; trackId: string; laps: number; charts: RaceCharts; round: number; replayKept: boolean }
+  | { name: 'replay'; config: RaceConfig; commands: CommandLog; key: number; back: Screen }
   | { name: 'season' }
   | { name: 'calendar'; back: 'hub' | 'season' }
   | { name: 'teams' }
@@ -184,10 +189,26 @@ export function App() {
   };
 
   const finishRace = (sim: RaceSim) => {
-    if (!career) return;
+    if (!career || screen.name !== 'race') return;
+    const round = career.results.length;
     const rows = scoreRace(sim.results(), sim.fastestLap?.carId ?? null);
-    commit(deliverProjects(settleRace(recordRace(career, sim.totalLaps, rows, racing)).career).career);
-    setScreen({ name: 'results', rows, trackId: sim.track.def.id, laps: sim.totalLaps });
+    const next = deliverProjects(settleRace(recordRace(career, sim.totalLaps, rows, racing)).career).career;
+    // The career is written first, so a full store loses the replay and never the season.
+    commit(next);
+    const replayKept = saveReplay(next, replayRecord(screen.config, sim, round));
+    setScreen({ name: 'results', rows, trackId: sim.track.def.id, laps: sim.totalLaps, charts: raceCharts(sim, career.playerTeamId), round, replayKept });
+  };
+
+  const watchReplay = (round: number, back: Screen) => {
+    if (!career) return;
+    const record = loadReplay(career, round);
+    if (!record) return;
+    const config = replayConfig(record, teams);
+    if (!checkReplay(config, record)) {
+      window.alert('This replay no longer matches the current version of the game, so it cannot be shown.');
+      return;
+    }
+    setScreen({ name: 'replay', config, commands: record.commands, key: Date.now(), back });
   };
 
   const goMenu = () => {
@@ -230,15 +251,22 @@ export function App() {
     case 'race':
       body = <RaceScreen key={screen.key} config={screen.config} onFinish={finishRace} />;
       break;
+    case 'replay': {
+      const back = screen.back;
+      body = <RaceScreen key={screen.key} config={screen.config} onFinish={() => setScreen(back)} replay={{ commands: screen.commands, onExit: () => setScreen(back) }} />;
+      break;
+    }
     case 'results':
       body = career ? (
         <ResultsScreen
           career={career}
           teams={racing}
           rows={screen.rows}
+          charts={screen.charts}
           trackId={screen.trackId}
           laps={screen.laps}
           onContinue={() => setScreen(isSeasonOver(career) ? { name: 'season' } : { name: 'hub' })}
+          onReplay={screen.replayKept ? () => watchReplay(screen.round, screen) : undefined}
         />
       ) : null;
       break;
@@ -248,6 +276,7 @@ export function App() {
           career={career}
           teams={racing}
           onStart={(decisions) => {
+            clearReplays();
             commit(startNextSeason(career, racing, decisions));
             setScreen({ name: 'hub' });
           }}
@@ -258,7 +287,15 @@ export function App() {
       break;
     case 'calendar': {
       const back = screen.back;
-      body = career ? <Calendar career={career} teams={racing} onBack={() => setScreen(back === 'hub' ? { name: 'hub' } : { name: 'season' })} /> : null;
+      body = career ? (
+        <Calendar
+          career={career}
+          teams={racing}
+          onBack={() => setScreen(back === 'hub' ? { name: 'hub' } : { name: 'season' })}
+          replays={replayRounds(career)}
+          onReplay={(round) => watchReplay(round, screen)}
+        />
+      ) : null;
       break;
     }
     case 'hq':
@@ -289,7 +326,7 @@ export function App() {
   }
 
   return (
-    <div className={screen.name === 'race' ? 'app fixed' : 'app'}>
+    <div className={screen.name === 'race' || screen.name === 'replay' ? 'app fixed' : 'app'}>
       <header className="topbar">
         <span className="brand">Pitwall</span>
         <span className="spacer" />

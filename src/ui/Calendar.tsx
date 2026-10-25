@@ -12,6 +12,9 @@ interface Props {
   career: Career;
   teams: TeamDef[];
   onBack: () => void;
+  /** Finished rounds that can be watched again. */
+  replays: number[];
+  onReplay: (round: number) => void;
 }
 
 /** Wear per kilometre against a 5.3 km reference, because wear is set per lap and laps differ in length. */
@@ -30,7 +33,7 @@ function passingWord(def: TrackDef): string {
 
 
 /** The season's rounds in order, with what each circuit asks of a team and how finished rounds went. */
-export function Calendar({ career, teams, onBack }: Props) {
+export function Calendar({ career, teams, onBack, replays, onReplay }: Props) {
   const tracks = useMemo(() => career.calendar.map((id) => new Track(trackById(id))), [career.calendar]);
   const next = currentRound(career);
   const driverName = (driverId: string): string => {
@@ -74,6 +77,11 @@ export function Calendar({ career, teams, onBack }: Props) {
                   <div className="note">
                     Won by {summary.winnerDriverId ? driverName(summary.winnerDriverId) : 'nobody'}.{' '}
                     {summary.playerBest !== null ? `Your best: ${ordinal(summary.playerBest)}, ${summary.playerPoints} points.` : 'Both your cars retired.'}
+                  </div>
+                )}
+                {race && replays.includes(round) && (
+                  <div>
+                    <button className="btn small" onClick={() => onReplay(round)}>Watch replay</button>
                   </div>
                 )}
               </div>

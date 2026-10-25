@@ -45,6 +45,10 @@ export interface LapRecord {
   pit: boolean;
   /** Counts for fastest-lap purposes (no pit stop, no safety car). */
   clean: boolean;
+  /** Tyre wear as the car crossed the line: 0 is new, and past 1 the tyre is beyond the end of its life. */
+  wear: number;
+  /** Some of the lap was run behind the safety car. */
+  safetyCar: boolean;
 }
 
 export interface StopRecord {
@@ -473,7 +477,8 @@ export class RaceSim {
   command(cmd: RaceCommand): void {
     const car = this.byId.get(cmd.carId);
     if (!car || car.status === 'out' || car.status === 'finished') return;
-    this.commandLog.push({ t: this.time, cmd });
+    // A copy, so a later change to the caller's object cannot rewrite what was given.
+    this.commandLog.push({ t: this.time, cmd: structuredClone(cmd) });
     switch (cmd.type) {
       case 'pace':
         car.paceMode = cmd.mode;
@@ -1061,6 +1066,8 @@ export class RaceSim {
       tyreAge: car.tyre.ageLaps,
       pit: car.currentLapPit,
       clean,
+      wear: car.tyre.wear,
+      safetyCar: car.currentLapSC,
     });
     car.lastLap = lapTime;
     if (clean) {

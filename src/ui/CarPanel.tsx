@@ -19,6 +19,8 @@ interface Props {
   /** Whether the camera is locked on this car. */
   following: boolean;
   onFollow: (carId: string | null) => void;
+  /** A replay shows the player's orders as they stood but takes none. */
+  readOnly?: boolean;
 }
 
 const PACE: { id: PaceMode; label: string; hint: string }[] = [
@@ -41,7 +43,7 @@ function Meter({ value, color, mark }: { value: number; color: string; mark?: nu
   );
 }
 
-function CarPanelView({ sim, car, dispatch, following, onFollow }: Props) {
+function CarPanelView({ sim, car, dispatch, following, onFollow, readOnly = false }: Props) {
   const mine = car.isPlayer;
   const out = car.status === 'out' || car.status === 'finished';
   const wearPct = car.tyre.wear;
@@ -146,7 +148,8 @@ function CarPanelView({ sim, car, dispatch, following, onFollow }: Props) {
       <Conditions sim={sim} />
 
       {mine && !out && (
-        <>
+        <fieldset className="stack car-orders" disabled={readOnly}>
+          {readOnly && <p className="muted small car-orders-note">Replay: your orders play out as you gave them.</p>}
           <div className="panel">
             <h3>Driving</h3>
             <div className="stack" style={{ gap: 10 }}>
@@ -211,7 +214,7 @@ function CarPanelView({ sim, car, dispatch, following, onFollow }: Props) {
               onChange={(p) => dispatch({ type: 'plan', carId: car.id, plan: { startCompound: car.tyre.compound, stops: p.stops } })}
             />
           </div>
-        </>
+        </fieldset>
       )}
     </div>
   );

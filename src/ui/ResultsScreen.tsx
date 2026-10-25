@@ -9,6 +9,8 @@ import { roundLines } from '../state/finance.ts';
 import { describeObjective, objectiveMet } from '../state/sponsors.ts';
 import { formatAmount, formatMoney } from './money.ts';
 import { LedgerLine } from './TeamHQ.tsx';
+import { RaceChartsPanel } from './RaceChartsPanel.tsx';
+import type { RaceCharts } from './raceCharts.ts';
 import { Standings } from './Standings.tsx';
 import { cssVar } from './colour.ts';
 
@@ -18,10 +20,13 @@ interface Props {
   rows: ScoredRow[];
   trackId: string;
   laps: number;
+  charts: RaceCharts;
   onContinue: () => void;
+  /** Missing when the race could not be kept for a replay. */
+  onReplay?: () => void;
 }
 
-export function ResultsScreen({ career, teams, rows, trackId, laps, onContinue }: Props) {
+export function ResultsScreen({ career, teams, rows, trackId, laps, charts, onContinue, onReplay }: Props) {
   const track = trackById(trackId);
   const byId = new Map<string, { team: TeamDef; name: string; code: string }>();
   for (const team of teams) {
@@ -45,6 +50,7 @@ export function ResultsScreen({ career, teams, rows, trackId, laps, onContinue }
             Round {career.results.length} of {career.calendar.length} · {laps} laps{winner ? ` · won by ${winner.name} (${winner.team.shortName})` : ''}
           </div>
         </div>
+        {onReplay && <button className="btn" onClick={onReplay}>Watch replay</button>}
         <button className="btn primary" onClick={onContinue}>
           {over ? 'See season summary' : 'Next race weekend'}
         </button>
@@ -128,6 +134,7 @@ export function ResultsScreen({ career, teams, rows, trackId, laps, onContinue }
           <Standings results={career.results} teams={teams} playerTeamId={career.playerTeamId} />
         </div>
       </div>
+      <RaceChartsPanel charts={charts} />
     </div>
   );
 }

@@ -135,13 +135,18 @@ The player's two drivers talk on the team radio (`src/ui/radio.ts`). They react 
 
 The timing tower, the car panel, race control and the story strip are memoised. They redraw on the race screen's 180 ms refresh, or at once when the player selects a car or gives a command. Before, they redrew on every animation frame. Measured on the production build in headless Chrome at 1440 by 900, with the CPU slowed four times: a race at 32x runs at 66 frames a second against 46 before (medians of 10 runs each, alternating), and at 4x race speed at 75 against 56 (5 runs each). At full CPU speed the work per frame fell from 4.6 to 2.7 ms. With the CPU slowed, selecting a car at 32x takes about 40 ms to paint against 34 ms before; at 4x race speed it is quicker, 24 ms against 29.
 
+After each race, Results draws two charts from the finished race's own lap records, so nothing new is saved: lap times for the player's two cars and the winner, and tyre wear for the player's cars against the 72% cliff. Every lap records the tyre's wear at the line and whether the safety car was out. The lap-time scale is set from racing laps, so a pit lap, the opening lap or a lap behind the safety car sits at the top edge instead of flattening the rest; the readout and a lap-by-lap table give the real times. The three series colours are fixed by role and were checked for colour-blind separation and contrast on the panel.
+
+Every finished race of the current season can be watched again from Results or the calendar. The race screen logs each order the player gives with the race time it was given at, and a replay feeds those orders back in just before the step at that time, so the race plays out lap for lap as it was run (`src/engine/replay.ts`). Live play goes through the same feed with an empty log, so the two cannot drift apart. A replay is the race's config, the teams as they raced without uploaded logo images, the orders and the finishing order, about 6 KB for a 12-lap race, kept under its own storage key apart from the career (`src/state/replays.ts`). The career is always written first: when storage is full the replays are cleared to make room. Before a replay opens, the game runs it headless and compares the finishing order with the one stored; if they differ, it shows a message instead of the replay. A replay shows the player's orders as they stood but takes none, and never pauses for a decision.
+
 ## Testing
 
-`node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), season standings, and the management layer: save migration from a real milestone 4 save, money, car development and rival progress, sponsors and their objectives, contracts and the change of season.
+`node --test` with native TypeScript type stripping, so there are no test dependencies. Covered: RNG, formatting, track geometry, strategy planner, race simulation (determinism, classification, lap and sector plausibility, fuel and wear bounds, car spacing, pit loss, safety car bunching, gaps after the flag, hazard scaling with distance, AI pace choices, auto mode, scoring), pit rejoin estimates, the key moments that pause a race, weather (rain frequency, forecast honesty and sharpness, wet tyre crossovers, wetting and drying, rival tyre changes, wet starts, a dry race unchanged by the weather model), season standings, and the management layer: save migration from a real milestone 4 save, money, car development and rival progress, sponsors and their objectives, contracts and the change of season; and replays, which replay a race from its orders to the same result and keep the career safe when storage runs out.
 
 ## Known limits
 
 - A race in progress is not saved; only completed rounds are.
+- Replays are kept for the current season only. An engine change that alters a race's finishing order retires its replay. One that moves only lap times or pit laps is not caught, and the replay shows the race as the new engine runs it.
 - A midfield team that spends ends about one place higher than one that does not, where the economy aimed for two places up.
 - Qualifying is always dry; rain arrives only in the race.
 - Rival teams sometimes fit intermediates and then full wets a few laps later in a strengthening shower, because they only see the rain already falling.
@@ -151,5 +156,4 @@ The timing tower, the car panel, race control and the story strip are memoised. 
 ## Roadmap
 
 1. Drivers who develop, and a transfer market in which rival teams sign drivers too.
-2. Replay from the command log, plus lap-time and tyre-wear charts.
-3. Wet qualifying.
+2. Wet qualifying.

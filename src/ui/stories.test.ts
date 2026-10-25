@@ -24,7 +24,7 @@ function overtake(sim: RaceSim, passer: string, passed: string, lap: number): vo
 }
 
 function lapRecord(lap: number, time: number, clean = true): LapRecord {
-  return { lap, time, sectors: [time / 3, time / 3, time / 3], compound: 'M', tyreAge: lap, pit: false, clean };
+  return { lap, time, sectors: [time / 3, time / 3, time / 3], compound: 'M', tyreAge: lap, pit: false, clean, wear: 0, safetyCar: false };
 }
 
 function story(kind: Story['kind'], priority: number, extra: Partial<Story> = {}): Story {

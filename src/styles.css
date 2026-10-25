@@ -44,6 +44,10 @@
   --shadow: 0 12px 32px rgb(0 0 0 / 0.6);
   --marker: rgb(255 255 255 / 0.4);
   --cut: 12px;
+  /* Chart series, in fixed order: the player's first car, their second, the winner. Checked for colour-blind separation and contrast on --panel. */
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
   --radius: 2px;
   --display: 'Saira Semi Condensed', 'Arial Narrow', system-ui, sans-serif;
   --sans: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -95,6 +99,9 @@ h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; lette
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .editor-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; align-items: start; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
+/* The player's orders sit in a fieldset so a replay can lock them all at once. */
+.car-orders { border: 0; margin: 0; padding: 0; min-width: 0; }
+.car-orders-note { margin: 0; }
 .row { display: flex; align-items: center; gap: 10px; }
 .row.wrap { flex-wrap: wrap; }
 .between { justify-content: space-between; }
@@ -209,6 +216,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .status-pill.fin { background: var(--pill-fin); color: var(--pill-fin-ink); }
 .status-pill.grid { background: var(--pill-grid); color: var(--pill-grid-ink); }
 .status-pill.rain { background: var(--pill-rain); color: var(--pill-rain-ink); }
+.status-pill.replay { background: var(--pill-grid); color: var(--pill-grid-ink); }
 
 /* ----- timing tower ----- */
 .tower { font-size: 12.5px; }
@@ -269,6 +277,27 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .hq-round + .hq-round { border-top: 1px solid var(--line); margin-top: 10px; }
 .hq-round .hq-h4 { margin-top: 10px; }
 .hq-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+
+/* ----- race charts ----- */
+.chart { margin: 0; min-width: 0; }
+.chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 4px; }
+.chart-head .hq-h4 { margin: 0; }
+.chart-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+.chart-legend i, .chart-tip i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 5px; }
+.chart-plot { position: relative; }
+.chart-plot svg { display: block; touch-action: pan-y; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-ref { stroke: var(--warn); stroke-width: 1; }
+.chart-sc { fill: var(--warn); opacity: 0.08; }
+.chart-axis { fill: var(--muted); font-size: 11px; }
+.chart-line { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { fill: currentColor; stroke: var(--panel); stroke-width: 2; }
+.chart-end { fill: var(--text); font-size: 11px; font-family: var(--display); font-weight: 700; }
+.chart-cross { stroke: var(--line-2); stroke-width: 1; }
+.chart-tip { position: absolute; top: 6px; min-width: 140px; pointer-events: none; background: var(--panel-2); border: 1px solid var(--line-2); padding: 6px 8px; font-size: 12px; box-shadow: var(--shadow); }
+.chart-tip b { display: block; margin-bottom: 2px; }
+.chart-table { margin-top: 10px; font-size: 12px; }
+.chart-table summary { cursor: pointer; color: var(--muted); }
 
 /* ----- season end ----- */
 .season-seat { border: 0; margin: 0; padding: 10px 0; min-width: 0; }

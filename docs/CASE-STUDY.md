@@ -17,7 +17,7 @@ A real-time race simulation has three requirements that pull against each other.
 | React architecture | `src/ui/RaceScreen.tsx`, `moments.ts` | A fixed 0.1 s simulation step inside an animation loop, with interpolation, and pausing on the exact step through refs |
 | State management and migrations | `src/state/migrate.ts`, `effectiveTeams.ts` | Saves read from every version the game has written, and the career laid over the editor's teams, so the engine still receives plain team data |
 | Game economy | `scripts/season.ts`, `src/state/finance.ts`, `development.ts`, `sponsors.ts` | Whole careers played headless, spending against not spending, with the targets and the one target missed recorded |
-| Testing | `src/**/*.test.ts` | 329 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
+| Testing | `src/**/*.test.ts` | 344 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
 | Calibration method | `scripts/calibrate.ts` | Batch runs of 300 headless races compared with real-race targets, recorded in `docs/DESIGN.md` |
 | CI/CD | `.github/workflows/ci.yml`, `deploy.yml` | GitHub Actions runs typecheck, lint, test and build, then deploys to Pages |
 | Accessibility | `src/ui/TimingTower.tsx`, `Conditions.tsx`, `DecisionPrompt.tsx` | A timing tower that works from the keyboard, ARIA meters, and an alert dialog for race decisions |

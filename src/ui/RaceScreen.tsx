@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RaceSim } from '../engine/race.ts';
 import type { RaceConfig } from '../engine/race.ts';
+import { CommandFeed, STEP_S } from '../engine/replay.ts';
+import type { CommandLog } from '../engine/replay.ts';
 import type { RaceCommand } from '../engine/types.ts';
 import { CameraView } from './CameraView.tsx';
 import { CarPanel } from './CarPanel.tsx';
@@ -20,7 +22,6 @@ import type { Story } from './stories.ts';
 import { TimingTower } from './TimingTower.tsx';
 import { TrackMap } from './TrackMap.tsx';
 
-const STEP = 0.1; // simulation timestep in seconds
 const SPEEDS = [1, 2, 4, 8, 16, 32];
 const PAUSE_KEY = 'pitwall.pauseForMoments';
 const STORIES_KEY = 'pitwall.stories';
@@ -57,10 +58,14 @@ function glance(sim: RaceSim): RaceGlance {
 interface Props {
   config: RaceConfig;
   onFinish: (sim: RaceSim) => void;
+  /** Plays a finished race back from its commands. The player watches but gives no orders, and nothing is recorded. */
+  replay?: { commands: CommandLog; onExit: () => void };
 }
 
-export function RaceScreen({ config, onFinish }: Props) {
+export function RaceScreen({ config, onFinish, replay }: Props) {
   const [sim] = useState(() => new RaceSim(config));
+  // Live play has an empty log, so live and replay step the race the same way.
+  const [feed] = useState(() => new CommandFeed(sim, replay?.commands ?? []));
   const [frame, setFrame] = useState(0);
   const [tick, setTick] = useState(0);
   // Worked out once per refresh, so the memoised story strip redraws only when it changes.
@@ -94,7 +99,8 @@ export function RaceScreen({ config, onFinish }: Props) {
   storiesOnRef.current = storiesOn;
   playingRef.current = playing && moment === null;
   speedRef.current = speed;
-  pauseRef.current = pauseForMoments;
+  // A replay never stops for a decision: the decisions were made when it was raced.
+  pauseRef.current = pauseForMoments && !replay;
   momentRef.current = moment;
 
   // Main loop: advance the sim in fixed steps, render every animation frame.
@@ -109,9 +115,9 @@ export function RaceScreen({ config, onFinish }: Props) {
         storyClockRef.current += dt;
         accRef.current += dt * speedRef.current;
         let n = 0;
-        while (accRef.current >= STEP && n < 600 && sim.phase === 'racing') {
-          sim.step(STEP);
-          accRef.current -= STEP;
+        while (accRef.current >= STEP_S && n < 600 && sim.phase === 'racing') {
+          feed.step(STEP_S);
+          accRef.current -= STEP_S;
           n++;
           const stories = nextStories(sim, storyWatchRef.current);
           const radio = radioFor(sim, radioRef.current, stories);
@@ -127,7 +133,7 @@ export function RaceScreen({ config, onFinish }: Props) {
         }
         if (n >= 600) accRef.current = 0;
       }
-      alphaRef.current = Math.min(1, accRef.current / STEP);
+      alphaRef.current = Math.min(1, accRef.current / STEP_S);
       storyRef.current = storiesOnRef.current ? storyQueueRef.current.current(storyClockRef.current, holdFor(speedRef.current)) : null;
       directionRef.current = direct(sim, directionRef.current, storyClockRef.current, storyRef.current, followRef.current);
       setFrame((f) => (f + 1) % 1_000_000);
@@ -139,10 +145,11 @@ export function RaceScreen({ config, onFinish }: Props) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [sim]);
+  }, [sim, feed]);
 
   const dispatch = useCallback(
     (cmd: RaceCommand) => {
+      if (replay) return;
       sim.command(cmd);
       // The driver answers a stop the player asks for; the acknowledgement comes from the request, not from car state.
       if (cmd.type === 'pit' && cmd.compound) {
@@ -151,10 +158,12 @@ export function RaceScreen({ config, onFinish }: Props) {
       }
       setTick((t) => t + 1);
     },
-    [sim],
+    [sim, replay],
   );
 
   const lightsOut = () => {
+    // Orders given on the grid go in before the start, as they did live.
+    feed.applyDue();
     sim.start();
     setPlaying(true);
   };
@@ -180,7 +189,7 @@ export function RaceScreen({ config, onFinish }: Props) {
     // Fast-forward to the flag without rendering every step.
     let guard = 0;
     while (sim.phase === 'racing' && guard < 400_000) {
-      sim.step(STEP);
+      feed.step(STEP_S);
       guard++;
     }
     watchRef.current = watchMoments(sim);
@@ -227,6 +236,7 @@ export function RaceScreen({ config, onFinish }: Props) {
         <b className="track-name">{sim.track.def.name}</b>
         <span className="muted">{sim.track.def.location}</span>
         {pill}
+        {replay && <span className="status-pill replay">REPLAY</span>}
         <span className="num">Lap {done ? sim.totalLaps : lap} / {sim.totalLaps}</span>
         {(sim.rain > 0 || sim.wetness > 0) && (
           <span className="status-pill rain">
@@ -251,10 +261,12 @@ export function RaceScreen({ config, onFinish }: Props) {
             <button className="btn" onClick={finishNow} disabled={done}>Skip to finish</button>
           </>
         )}
-        <label className="row" style={{ gap: 6 }}>
-          <input type="checkbox" checked={pauseForMoments} onChange={(e) => togglePause(e.target.checked)} />
-          <span className="muted">Pause for key moments</span>
-        </label>
+        {!replay && (
+          <label className="row" style={{ gap: 6 }}>
+            <input type="checkbox" checked={pauseForMoments} onChange={(e) => togglePause(e.target.checked)} />
+            <span className="muted">Pause for key moments</span>
+          </label>
+        )}
         <label className="row" style={{ gap: 6 }}>
           <input type="checkbox" checked={storiesOn} onChange={(e) => toggleStories(e.target.checked)} />
           <span className="muted">Stories</span>
@@ -263,10 +275,16 @@ export function RaceScreen({ config, onFinish }: Props) {
           <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} />
           <span className="muted">All labels</span>
         </label>
-        {done && (
-          <button className="btn primary" onClick={() => onFinish(sim)}>
-            Results
+        {replay ? (
+          <button className={`btn ${done ? 'primary' : ''}`} onClick={replay.onExit}>
+            Close replay
           </button>
+        ) : (
+          done && (
+            <button className="btn primary" onClick={() => onFinish(sim)}>
+              Results
+            </button>
+          )
         )}
       </div>
 
@@ -309,7 +327,7 @@ export function RaceScreen({ config, onFinish }: Props) {
         </div>
       </div>
 
-      <div className="col">{selected ? <CarPanel sim={sim} car={selected} tick={tick} dispatch={dispatch} following={followId === selected.id} onFollow={setFollowId} /> : <div className="panel muted">Select a car on the map or in the timing tower.</div>}</div>
+      <div className="col">{selected ? <CarPanel sim={sim} car={selected} tick={tick} dispatch={dispatch} following={followId === selected.id} onFollow={setFollowId} readOnly={!!replay} /> : <div className="panel muted">Select a car on the map or in the timing tower.</div>}</div>
     </div>
   );
 }

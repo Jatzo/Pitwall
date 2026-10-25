@@ -452,3 +452,32 @@ describe('weather in the race', () => {
     assert.equal(car.penaltySeconds, 0);
   });
 });
+
+describe('lap records', () => {
+  it('record tyre wear at the line, which only falls across a pit stop', () => {
+    const sim = run(makeSim({ seed: 3, laps: 30 }));
+    let falls = 0;
+    for (const car of sim.cars) {
+      car.laps.forEach((lap, i) => {
+        // A tyre can run past 1, the end of its life; the race bounds it below 1.5.
+        assert.ok(lap.wear >= 0 && lap.wear < 1.5, `${car.id} lap ${lap.lap} wear ${lap.wear}`);
+        const prev = car.laps[i - 1];
+        if (prev && lap.wear < prev.wear) {
+          falls++;
+          assert.ok(lap.pit || prev.pit, `${car.id} lap ${lap.lap}: wear fell with no stop`);
+        }
+      });
+    }
+    assert.ok(falls > 0, 'someone changed tyres in 30 laps');
+  });
+
+  it('mark the laps run behind the safety car, which never count as clean', () => {
+    // Search a few seeds for a race with a safety car, so the test does not rest on one seed's luck.
+    const sim = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => run(makeSim({ seed, laps: 30 }))).find((s) => s.scCount > 0);
+    assert.ok(sim, 'a safety car in one of eight 30-lap races');
+    const laps = sim.cars.flatMap((c) => c.laps);
+    assert.ok(laps.some((l) => l.safetyCar));
+    assert.ok(laps.filter((l) => l.safetyCar).every((l) => !l.clean));
+  });
+});
+
