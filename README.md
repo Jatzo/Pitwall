@@ -11,20 +11,22 @@ Everything in it is fictional (teams, drivers, circuits), and everything is edit
 | Weekend planning | Results | Team HQ |
 | --- | --- | --- |
 | ![Weekend](docs/screenshots/weekend.png) | ![Results](docs/screenshots/results.png) | ![Team HQ](docs/screenshots/team-hq.png) |
+| **Race charts** | **Replay** | **Difficulty** |
+| ![Race charts](docs/screenshots/race-charts.png) | ![Replay](docs/screenshots/replay.png) | ![Difficulty](docs/screenshots/difficulty.png) |
 | **Season end** | **Team editor** | |
 | ![Season end](docs/screenshots/season-end.png) | ![Editor](docs/screenshots/team-editor.png) | |
 
-The careers in these screenshots were played headless with the game's own engine, then opened in the game.
+The careers in the Team HQ and season-end screenshots were played headless with the game's own engine, then opened in the game. The results, charts and replay come from a Hard race played in the game.
 
 ## What this project shows
 
-Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells eleven problems as seen, measured, changed and result.
+Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells thirteen problems as seen, measured, changed and result.
 
 - **Modelling and algorithms:** circuits built from real corner radii, tyre wear, weather, strategy search, 10 m checkpoint gap timing.
 - **Probability:** a Bayesian rain forecast, checked over 2,000 races per race length.
-- **Deterministic design:** a separate seeded random stream for each purpose.
+- **Deterministic design:** a separate seeded random stream for each purpose, and replays rebuilt from the player's orders alone.
 - **Calibration:** 300 headless races per tuning run, compared with real-race targets.
-- **Game economy:** whole careers played headless, spending against not spending, and the money tuned to what they showed.
+- **Game balance:** whole careers played headless, spending against not spending and on each difficulty, and the money and rival strength tuned to what they showed.
 - **State and saves:** versioned saves. A milestone 4 save moves up once and stays as a backup, and a save the game cannot read is reported on the menu and kept until the player chooses to replace it.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
 - **Testing and CI:** 352 tests, with GitHub Actions running typecheck, lint, test, build and deploy.

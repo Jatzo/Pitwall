@@ -13,10 +13,11 @@ A real-time race simulation has three requirements that pull against each other.
 | Simulation modelling | `src/engine/track.ts`, `tyres.ts`, `weather.ts`, `race.ts` | Circuits built from straights and true arcs of real radii, speed profiles from grip that rises with speed, tyre wear with a cliff, and a wet-track model, running a 58-lap race headless in well under a second |
 | Algorithms | `src/engine/strategy.ts`, `race.ts`, `circuitBuilder.ts` | Strategy search with greedy stint allocation, gap timing from 10 m checkpoints, and corner arcs fitted between straights with the clash named when two corners do not fit |
 | Probability | `src/engine/weather.ts` | A rain forecast built with Bayes' rule, with its reliability measured over 2,000 races per race length |
-| Deterministic design | `src/engine/rng.ts` | `mixSeed(seed, label)` gives each purpose its own random stream, so adding a car or an event does not reshuffle other draws |
+| Deterministic design | `src/engine/rng.ts`, `replay.ts` | `mixSeed(seed, label)` gives each purpose its own random stream, so adding a car or an event does not reshuffle other draws, and a replay is the race's config plus the player's orders |
+| Data visualisation | `src/ui/RaceChartsPanel.tsx`, `raceCharts.ts` | Hand-drawn SVG lap-time and tyre-wear charts, with series colours checked for colour-blind separation and a lap-by-lap table behind them |
 | React architecture | `src/ui/RaceScreen.tsx`, `moments.ts` | A fixed 0.1 s simulation step inside an animation loop, with interpolation, and pausing on the exact step through refs |
 | State management and migrations | `src/state/migrate.ts`, `effectiveTeams.ts` | Saves read from every version the game has written, and the career laid over the editor's teams, so the engine still receives plain team data |
-| Game economy | `scripts/season.ts`, `src/state/finance.ts`, `development.ts`, `sponsors.ts` | Whole careers played headless, spending against not spending, with the targets and the one target missed recorded |
+| Game balance | `scripts/season.ts`, `src/state/finance.ts`, `development.ts`, `sponsors.ts`, `src/engine/tuning.ts` | Whole careers played headless, spending against not spending and on each difficulty, with the targets and the targets missed recorded |
 | Testing | `src/**/*.test.ts` | 352 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
 | Calibration method | `scripts/calibrate.ts` | Batch runs of 300 headless races compared with real-race targets, recorded in `docs/DESIGN.md` |
 | CI/CD | `.github/workflows/ci.yml`, `deploy.yml` | GitHub Actions runs typecheck, lint, test and build, then deploys to Pages |
@@ -134,6 +135,26 @@ A real-time race simulation has three requirements that pull against each other.
 **Changed.** Prize money fell from £0.1m to £0.04m a point, and every team is paid £0.6m for starting. Each rival's budget is scaled by what its own level costs, so every rival gains about the same points a round. A point costs more with the fourth power of a rating's distance towards 99, so one at 92 costs about twice one at 84. Sponsor objectives were reset to a top N set by where the car ranks, and to beating the team one place up.
 
 **Result.** Over three seeds (`npm run season -- --seasons 3 --seeds 3`), with a midfield team as the player the gap held at 23.9, 23.6 and 24.0 points over three seasons, and the strongest team spending everything opened it by 3.3 to 3.9. Sponsor objectives were met in 79 to 93% of races for safe deals, 39 to 80% for balanced and 14 to 68% for ambitious. From its second season, a team that spends finishes about a place higher than one that does not. The aim was two places, so the gap is recorded as a known limit.
+
+### 12. Watching a race again without storing the race
+
+**Seen.** A finished race could not be seen again. The engine already makes a race a function of its config and seed, and the player changes it only by giving orders, so the orders are all a replay needs. The risk was drift. A replay that fed an order in one step early or late would run a different race and nobody would notice.
+
+**Measured.** Every order the player gives is logged with the race time it was given at. A 12-lap race with its orders comes to about 6 KB, and a test keeps a 25-lap race under 20 KB. Checking a replay by running it headless took 142 ms for a 12-lap race in the browser.
+
+**Changed.** Live play and replay step the race through the same feed, which hands each logged order to the race just before the step at its time; live play has an empty log, so the two cannot drift apart. Each order is copied as it is logged, so a later change to the caller's object cannot rewrite it. Replays sit under their own storage key, apart from the career, and only the current season's are kept. The career is written first, and when storage is full the replays are cleared to make room. Before a replay opens, it is run headless and its finishing order compared with the one stored; if they differ, the game says so instead of showing a different race.
+
+**Result.** A test replays a race with grid, pace, plan, pit and auto orders to the same result lap for lap, and shows the race comes out differently without the orders. In the browser, a replay finished in the same order as the live race, survived a page reload, and opened from both Results and the calendar. A test fills storage and confirms the career is kept and the replays go.
+
+### 13. A difficulty setting that leaves the tuned game alone
+
+**Seen.** The game had one level of challenge. Every balance figure in this study, every seeded test and every stored replay depends on the races coming out as they do, so a new setting must not move Medium at all.
+
+**Measured.** Each level was played over three seeded seasons with a midfield team that never spends, and again with the rivals' pace switched off, so their pit-wall calls could be measured on their own: how far a rival's first stop sits from the best plan, and how long rivals spend on the wrong kind of tyre in wet races. The first plan made Hard's rivals plan with a little less noise. It moved their first stops only from 4.3 to 4.0 laps from the best plan, because the planner sees stop laps a few laps apart as almost the same cost, so even a little noise moves a stop several laps. Adding noise on Easy changed nothing, because a tyre's life limits how late a stop can move, and Medium's noise already reaches that limit.
+
+**Changed.** Rivals are 0.75 s a lap slower on Easy and 0.4 s quicker on Hard, in qualifying and the race. On Hard they plan with no noise and change tyres for rain close to the break-even point. On Easy they wait for a larger gain before changing tyres. Medium keeps every number it had, and the random streams draw the same values in the same order, so a test pins Medium's values and seeded races are unchanged. The player's cars, on auto or not, are never touched.
+
+**Result.** The midfield team's average place was 3.7 on Easy, 6.7 on Medium and 8.3 on Hard. On Hard, rivals' first stops sit 1.7 laps from the best plan, against 4.3 on Medium. In rain, rivals spend 519 s each on the wrong tyres per wet race on Easy, 421 s on Medium and 387 s on Hard. The target for Hard was 2.5 places lower and it reached 1.6. Pushing further needs rivals about 0.9 s a lap quicker, and at 0.55 s the top team's wins without spending already fell from two a season to 0.7, so Hard was held at 0.4 s and the shortfall is recorded. Planning with no noise on Hard also puts teammates on the same stop lap more often (40% of races against 32%), so they queue in their pit box; that is recorded as a known limit too.
 
 ## Run it
 
