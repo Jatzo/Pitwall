@@ -179,31 +179,33 @@ export function WeekendHub({ career, teams, onStart, onCalendar, onHQ }: Props) 
             </div>
             {!quali && <div className="muted">Three knockout sessions decide the grid. Run it, then set your race strategy.</div>}
             {quali && (
-              <table className="tbl">
-                <thead>
-                  <tr><th>P</th><th>Driver</th><th className="r">Q1</th><th className="r">Q2</th><th className="r">Q3</th></tr>
-                </thead>
-                <tbody>
-                  {quali.rows.map((r) => {
-                    const info = byId.get(r.carId);
-                    if (!info) return null;
-                    return (
-                      <tr key={r.carId} className={info.team.id === career.playerTeamId ? 'me' : ''}>
-                        <td className="num">{r.position}</td>
-                        <td>
-                          <span className="team-chip">
-                            <span className="swatch" style={cssVar('--team', info.team.colors.primary)} />
-                            {info.name}
-                          </span>
-                        </td>
-                        <td className="r num">{r.q1 !== null ? formatLap(r.q1) : ''}</td>
-                        <td className="r num">{r.q2 !== null ? formatLap(r.q2) : ''}</td>
-                        <td className="r num">{r.q3 !== null ? formatLap(r.q3) : ''}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="scroll-x">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>P</th><th>Driver</th><th className="r">Q1</th><th className="r">Q2</th><th className="r">Q3</th></tr>
+                  </thead>
+                  <tbody>
+                    {quali.rows.map((r) => {
+                      const info = byId.get(r.carId);
+                      if (!info) return null;
+                      return (
+                        <tr key={r.carId} className={info.team.id === career.playerTeamId ? 'me' : ''}>
+                          <td className="num">{r.position}</td>
+                          <td>
+                            <span className="team-chip">
+                              <span className="swatch" style={cssVar('--team', info.team.colors.primary)} />
+                              {info.name}
+                            </span>
+                          </td>
+                          <td className="r num">{r.q1 !== null ? formatLap(r.q1) : ''}</td>
+                          <td className="r num">{r.q2 !== null ? formatLap(r.q2) : ''}</td>
+                          <td className="r num">{r.q3 !== null ? formatLap(r.q3) : ''}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 

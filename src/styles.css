@@ -114,8 +114,9 @@ h1, h2, h3, h4 { margin: 0; font-family: var(--display); font-weight: 700; lette
 .pos-big { font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1; }
 .key-hint { opacity: 0.8; font-weight: 400; }
 @media (max-width: 900px) {
-  .grid2, .editor-grid { grid-template-columns: 1fr; }
-  .grid2.wide { grid-template-columns: minmax(0, 1fr); }
+  /* minmax(0, ...) lets the column shrink below a wide table, which then scrolls inside its .scroll-x. */
+  .grid2, .grid2.wide { grid-template-columns: minmax(0, 1fr); }
+  .editor-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) { .page-title { font-size: 22px; } .hero h1 { font-size: 36px; } }
 
