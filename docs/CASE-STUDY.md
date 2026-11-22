@@ -18,9 +18,10 @@ A real-time race simulation has three requirements that pull against each other.
 | React architecture | `src/ui/RaceScreen.tsx`, `moments.ts` | A fixed 0.1 s simulation step inside an animation loop, with interpolation, and pausing on the exact step through refs |
 | State management and migrations | `src/state/migrate.ts`, `effectiveTeams.ts` | Saves read from every version the game has written, and the career laid over the editor's teams, so the engine still receives plain team data |
 | Game balance | `scripts/season.ts`, `src/state/finance.ts`, `development.ts`, `sponsors.ts`, `src/engine/tuning.ts` | Whole careers played headless, spending against not spending and on each difficulty, with the targets and the targets missed recorded |
-| Testing | `src/**/*.test.ts` | 360 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
+| Testing | `src/**/*.test.ts` | 373 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
 | Calibration method | `scripts/calibrate.ts` | Batch runs of 300 headless races compared with real-race targets, recorded in `docs/DESIGN.md` |
 | CI/CD | `.github/workflows/ci.yml`, `deploy.yml` | GitHub Actions runs typecheck, lint, test and build, then deploys to Pages |
+| 3D graphics | `src/ui/three/` | A three.js race camera built from the 2D map's own track and scenery data in real metres, loaded only on demand, with a frame drawn from its inputs alone and every shape tested in Node |
 | Accessibility | `src/ui/TimingTower.tsx`, `Conditions.tsx`, `DecisionPrompt.tsx` | A timing tower that works from the keyboard, ARIA meters, and an alert dialog for race decisions |
 | Documentation | `README.md`, `docs/DESIGN.md` | Architecture, model decisions with reasons, measured tables and known limits |
 
@@ -165,6 +166,16 @@ A real-time race simulation has three requirements that pull against each other.
 **Changed.** The save is the replay record without the finishing order, plus a count of the fixed steps run since the lights. I used a step count rather than a race time, so resuming never depends on comparing two floating-point clocks. Orders given while paused at the save point go in before the race is handed back. A fingerprint of the race taken at the save must match after the run, so a game update that changes the race is caught and the save dropped. A review of the plan caught three things before any code was written. A decision prompt open at the save would be lost on resume and the race would restart at 4x, so a resumed race opens paused. The progress callback would have gone stale inside the main loop. The race save could also have crowded out the career when storage was full, so the career now clears the replays first and the race second. Testing found one more case. A race left the instant the lights went out resumed on the grid, which is correct, but its fingerprint differed, so the fingerprint now ignores track position until the first step.
 
 **Result.** A test picks a race up at step 1,500, with an order given at that very step, and finishes it to the same result, lap for lap and with the same order log, as a race run straight through. In the browser, I paused a race on lap 1, gave two orders and reloaded. It came back paused on lap 1 with the car in the same place and both orders in force. Finishing it cleared the save and recorded the round, and its replay passed the playback check.
+
+### 15. A 3D camera that is worth switching on
+
+**Seen.** The race could only be watched from above. A 3D view was next, and the risk was frame rate: the race screen already redraws a map, a camera and a timing tower every frame, and a 3D scene could slow the whole thing.
+
+**Measured.** I built a spike first, with box cars, flat ground and placeholder trees and blocks, and set a gate before going further: 55 frames a second or more at 32x, and the 3D drawing under 6 ms a frame. Headless Chrome draws WebGL in software, so the gate was measured in a real Chrome window on the GPU (an RTX 5070). The spike held 240 frames a second, the display's own limit, in 2D and in 3D, and its drawing took 0.2 ms. The boxes passed the gate but looked like boxes, and the feedback on them was blunt, so that headroom went on the look.
+
+**Changed.** The car became an original open-wheel single-seater, with turning wheels and compound bands on the tyres. The road got texture, edge lines and kerbs, the scenery got real sizes, and the street circuits got walls and catch fencing. The first lit version was washed out: the sky model lit everything so brightly that a blue car read as white, so I replaced it with a gradient sky whose colours I set directly. Two choices came from a review of the plan before any code: the scene draws each frame from its inputs alone, so a recording can reuse it later, and the toggle is off by default. Testing in the browser found that Windows reports reduced motion when its animation effects are off, so on that machine the 3D view shows only held aerial shots, which is what it should do.
+
+**Result.** With the full look, the race still holds 240 frames a second at 4x and 32x on three circuits, and the 3D drawing takes 0.6 ms at the 95th percentile. The 3D code is a 149 KB gzipped download, fetched only when 3D is switched on. The scene builds in about a third of a second. Losing the WebGL context, or a missing 3D download, brings back the 2D close-up, and switching 3D on and off five times leaves nothing on the GPU. The frame rate on a phone has not been measured.
 
 ## Run it
 

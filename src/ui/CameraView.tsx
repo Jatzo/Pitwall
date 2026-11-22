@@ -3,6 +3,8 @@ import type { CarState, RaceSim } from '../engine/race.ts';
 import { cameraWindow } from './director.ts';
 import type { CameraWindow, Shot } from './director.ts';
 import { carPose } from './markers.ts';
+import { CAMERA_3D_KEY, loadChoice, saveChoice } from './flags.ts';
+import { ThreeView } from './three/ThreeView.tsx';
 import { Ground, Marker, garageOrder, mapView } from './TrackMap.tsx';
 
 interface Props {
@@ -33,12 +35,29 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
+let webgl: boolean | null = null;
+
+/** Whether this browser can draw WebGL at all, asked once. */
+function hasWebGL(): boolean {
+  if (webgl === null) {
+    try {
+      const probe = document.createElement('canvas').getContext('webgl2');
+      webgl = !!probe;
+      // The check is all it is for, so give the context back to the GPU at once.
+      probe?.getExtension('WEBGL_lose_context')?.loseContext();
+    } catch {
+      webgl = false;
+    }
+  }
+  return webgl;
+}
+
 /**
  * A close-up camera beside race control, pointed by the director. The ground
  * is the map's own static layer, drawn once and moved with a CSS transform;
  * only the cars redraw each frame.
  */
-export function CameraView({ sim, shot, alpha, speed, selectedId, onSelect, following, onAuto }: Props) {
+export function CameraView({ sim, shot, alpha, speed, frame, selectedId, onSelect, following, onAuto }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [px, setPx] = useState({ w: 320, h: 200 });
   useLayoutEffect(() => {
@@ -50,6 +69,39 @@ export function CameraView({ sim, shot, alpha, speed, selectedId, onSelect, foll
   }, []);
   const reduced = useReducedMotion();
   const windowRef = useRef<CameraWindow | null>(null);
+  const [threeD, setThreeD] = useState(() => loadChoice(CAMERA_3D_KEY) && hasWebGL());
+  const chooseThreeD = (on: boolean) => {
+    setThreeD(on);
+    saveChoice(CAMERA_3D_KEY, on);
+  };
+
+  const label = (
+    <div className="camera-label">
+      <span>{shot?.label ?? ''}</span>
+      {following && (
+        <button className="btn small" onClick={onAuto}>
+          Auto
+        </button>
+      )}
+      {hasWebGL() && (
+        <button className={`btn small ${threeD ? 'active' : ''}`} aria-pressed={threeD} onClick={() => chooseThreeD(!threeD)}>
+          3D
+        </button>
+      )}
+    </div>
+  );
+
+  if (threeD) {
+    return (
+      <div className="panel camera">
+        <div className="camera-frame" ref={frameRef}>
+          {/* If 3D cannot be shown, the 2D close-up comes back for this race; the saved choice stays. */}
+          <ThreeView sim={sim} shot={shot} alpha={alpha} frame={frame} speed={speed} reducedMotion={reduced} width={px.w} height={px.h} onFail={() => setThreeD(false)} />
+          {label}
+        </div>
+      </div>
+    );
+  }
 
   const t = sim.track;
   const garages = garageOrder(sim);
@@ -102,14 +154,7 @@ export function CameraView({ sim, shot, alpha, speed, selectedId, onSelect, foll
             />
           ))}
         </svg>
-        <div className="camera-label">
-          <span>{shot?.label ?? ''}</span>
-          {following && (
-            <button className="btn small" onClick={onAuto}>
-              Auto
-            </button>
-          )}
-        </div>
+        {label}
       </div>
     </div>
   );

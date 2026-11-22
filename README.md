@@ -13,14 +13,14 @@ Everything in it is fictional (teams, drivers, circuits), and everything is edit
 | ![Weekend](docs/screenshots/weekend.png) | ![Results](docs/screenshots/results.png) | ![Team HQ](docs/screenshots/team-hq.png) |
 | **Race charts** | **Replay** | **Difficulty** |
 | ![Race charts](docs/screenshots/race-charts.png) | ![Replay](docs/screenshots/replay.png) | ![Difficulty](docs/screenshots/difficulty.png) |
-| **Season end** | **Team editor** | |
-| ![Season end](docs/screenshots/season-end.png) | ![Editor](docs/screenshots/team-editor.png) | |
+| **Season end** | **Team editor** | **3D camera** |
+| ![Season end](docs/screenshots/season-end.png) | ![Editor](docs/screenshots/team-editor.png) | ![3D camera](docs/screenshots/3d-camera.png) |
 
-The careers in the Team HQ and season-end screenshots were played headless with the game's own engine, then opened in the game. The results, charts and replay come from a Hard race played in the game.
+The careers in the Team HQ and season-end screenshots were played headless with the game's own engine, then opened in the game. The results, charts and replay come from a Hard race played in the game. The 3D camera is shown enlarged; in the game it sits in the panel beside race control.
 
 ## What this project shows
 
-Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells thirteen problems as seen, measured, changed and result.
+Pitwall is a real-time race simulation that has to be deterministic, plausible and fun. The [case study](docs/CASE-STUDY.md) maps each skill to the code that shows it, then tells fifteen problems as seen, measured, changed and result.
 
 - **Modelling and algorithms:** circuits built from real corner radii, tyre wear, weather, strategy search, 10 m checkpoint gap timing.
 - **Probability:** a Bayesian rain forecast, checked over 2,000 races per race length.
@@ -29,7 +29,8 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 - **Game balance:** whole careers played headless, spending against not spending and on each difficulty, and the money and rival strength tuned to what they showed.
 - **State and saves:** versioned saves. A milestone 4 save moves up once and stays as a backup, and a save the game cannot read is reported on the menu and kept until the player chooses to replace it.
 - **React architecture:** a fixed 0.1 s step inside an animation loop, pausing on the exact step.
-- **Testing and CI:** 360 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
+- **3D graphics:** a three.js race camera built from the same track and scenery data as the 2D map, loaded only when it is switched on, with every frame drawn from its inputs alone.
+- **Testing and CI:** 373 tests, with GitHub Actions running typecheck, lint, test, build and deploy.
 - **Accessibility:** a keyboard-operable timing tower, ARIA meters and dialogs.
 
 ## What is in the game
@@ -45,6 +46,7 @@ Pitwall is a real-time race simulation that has to be deterministic, plausible a
 
 ![The ten circuits](docs/circuits.svg)
 - **Difficulty**: Easy, Medium or Hard, picked for each career. It sets how quick the rival teams are and how well they call their pit stops; your own cars are the same on every level.
+- **3D camera**, switched on beside race control: an original open-wheel car in each team's livery, with tyres showing their compound, on textured asphalt with kerbs, run-off, grandstands, trees and city streets lined with walls and catch fencing. A chase camera up to 4x, an aerial shot from 8x or with reduced motion on, and the 2D close-up whenever 3D cannot be shown.
 - **Speed control** from 1x to 32x, pause, and skip to the flag.
 
 ## The simulation
@@ -88,12 +90,13 @@ src/engine/   simulation (no UI imports): track, tyres, race, strategy, qualifyi
 src/data/     fictional teams, drivers and circuits
 src/state/    seasons, standings, saves and their migration, money, car development, sponsors, contracts
 src/ui/       React components: track map, timing tower, pit wall, hub, results, team editor
+src/ui/three/ the 3D camera: shapes as plain arrays (tested in Node), the car, textures and the three.js scene
 scripts/      headless race runner, calibration, season balance and circuit inspector
 ```
 
 ## Tech
 
-TypeScript (strict), React 19, Vite 7, Node's built-in test runner, ESLint 9, GitHub Actions.
+TypeScript (strict), React 19, Vite 7, three.js (the 3D camera only), Node's built-in test runner, ESLint 9, GitHub Actions.
 
 ## Status
 
