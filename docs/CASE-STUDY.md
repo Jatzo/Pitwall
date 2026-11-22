@@ -18,7 +18,7 @@ A real-time race simulation has three requirements that pull against each other.
 | React architecture | `src/ui/RaceScreen.tsx`, `moments.ts` | A fixed 0.1 s simulation step inside an animation loop, with interpolation, and pausing on the exact step through refs |
 | State management and migrations | `src/state/migrate.ts`, `effectiveTeams.ts` | Saves read from every version the game has written, and the career laid over the editor's teams, so the engine still receives plain team data |
 | Game balance | `scripts/season.ts`, `src/state/finance.ts`, `development.ts`, `sponsors.ts`, `src/engine/tuning.ts` | Whole careers played headless, spending against not spending and on each difficulty, with the targets and the targets missed recorded |
-| Testing | `src/**/*.test.ts` | 352 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
+| Testing | `src/**/*.test.ts` | 360 `node:test` tests, including statistical tests (forecast honesty, rain frequency), geometry tests (every circuit checked for faults) and a real milestone 4 save as a migration fixture |
 | Calibration method | `scripts/calibrate.ts` | Batch runs of 300 headless races compared with real-race targets, recorded in `docs/DESIGN.md` |
 | CI/CD | `.github/workflows/ci.yml`, `deploy.yml` | GitHub Actions runs typecheck, lint, test and build, then deploys to Pages |
 | Accessibility | `src/ui/TimingTower.tsx`, `Conditions.tsx`, `DecisionPrompt.tsx` | A timing tower that works from the keyboard, ARIA meters, and an alert dialog for race decisions |
@@ -155,6 +155,16 @@ A real-time race simulation has three requirements that pull against each other.
 **Changed.** Rivals are 0.75 s a lap slower on Easy and 0.4 s quicker on Hard, in qualifying and the race. On Hard they plan with no noise and change tyres for rain close to the break-even point. On Easy they wait for a larger gain before changing tyres. Medium keeps every number it had, and the random streams draw the same values in the same order, so a test pins Medium's values and seeded races are unchanged. The player's cars, on auto or not, are never touched.
 
 **Result.** The midfield team's average place was 3.7 on Easy, 6.7 on Medium and 8.3 on Hard. On Hard, rivals' first stops sit 1.7 laps from the best plan, against 4.3 on Medium. In rain, rivals spend 519 s each on the wrong tyres per wet race on Easy, 421 s on Medium and 387 s on Hard. The target for Hard was 2.5 places lower and it reached 1.6. Pushing further needs rivals about 0.9 s a lap quicker, and at 0.55 s the top team's wins without spending already fell from two a season to 0.7, so Hard was held at 0.4 s and the shortfall is recorded. Planning with no noise on Hard also puts teammates on the same stop lap more often (40% of races against 32%), so they queue in their pit box; that is recorded as a known limit too.
+
+### 14. Picking up a race where it was left
+
+**Seen.** Closing the tab mid-race lost the race, and the Menu button warned that it would. The replay work had already made a race a function of its config, seed and orders, so the only thing missing was how far into the race the player had got.
+
+**Measured.** A full 50-lap race runs headless in 390 to 460 ms in Node on three circuits, so running a race back to where it was left is quick enough to do when the player presses Continue. A save on the first lap of a 20-lap race is about 6 KB.
+
+**Changed.** The save is the replay record without the finishing order, plus a count of the fixed steps run since the lights. I used a step count rather than a race time, so resuming never depends on comparing two floating-point clocks. Orders given while paused at the save point go in before the race is handed back. A fingerprint of the race taken at the save must match after the run, so a game update that changes the race is caught and the save dropped. A review of the plan caught three things before any code was written. A decision prompt open at the save would be lost on resume and the race would restart at 4x, so a resumed race opens paused. The progress callback would have gone stale inside the main loop. The race save could also have crowded out the career when storage was full, so the career now clears the replays first and the race second. Testing found one more case. A race left the instant the lights went out resumed on the grid, which is correct, but its fingerprint differed, so the fingerprint now ignores track position until the first step.
+
+**Result.** A test picks a race up at step 1,500, with an order given at that very step, and finishes it to the same result, lap for lap and with the same order log, as a race run straight through. In the browser, I paused a race on lap 1, gave two orders and reloaded. It came back paused on lap 1 with the car in the same place and both orders in force. Finishing it cleared the save and recorded the round, and its replay passed the playback check.
 
 ## Run it
 

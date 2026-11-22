@@ -7,6 +7,7 @@ import type { RaceConfig, RaceSim } from './engine/race.ts';
 import type { CommandLog } from './engine/replay.ts';
 import type { Difficulty, TeamDef } from './engine/types.ts';
 import { clearCareer, loadCareer, loadTeams, resetTeams, saveCareer, saveTeams } from './state/storage.ts';
+import { clearRace, loadRace, resumeRace, saveRace } from './state/raceSave.ts';
 import { checkReplay, clearReplays, loadReplay, replayConfig, replayRecord, replayRounds, saveReplay } from './state/replays.ts';
 import { deliverProjects, startProject } from './state/development.ts';
 import { effectiveTeams } from './state/effectiveTeams.ts';
@@ -33,7 +34,7 @@ import jatzoMark from './assets/jatzo-mark.png';
 type Screen =
   | { name: 'menu' }
   | { name: 'hub' }
-  | { name: 'race'; config: RaceConfig; key: number }
+  | { name: 'race'; config: RaceConfig; key: number; start?: { sim: RaceSim; steps: number } }
   | { name: 'results'; rows: ScoredRow[]; trackId: string; laps: number; charts: RaceCharts; round: number; replayKept: boolean }
   | { name: 'replay'; config: RaceConfig; commands: CommandLog; key: number; back: Screen }
   | { name: 'season' }
@@ -46,12 +47,14 @@ interface MenuProps {
   career: Career | null;
   /** Why the saved season could not be read, if it could not. */
   saveProblem: string | null;
+  /** A race was left part-way, and Continue goes back to it. */
+  raceSaved: boolean;
   onNew: (teamId: string, difficulty: Difficulty) => void;
   onContinue: () => void;
   onTeams: () => void;
 }
 
-function Menu({ teams, career, saveProblem, onNew, onContinue, onTeams }: MenuProps) {
+function Menu({ teams, career, saveProblem, raceSaved, onNew, onContinue, onTeams }: MenuProps) {
   const [pick, setPick] = useState(teams[0].id);
   const [level, setLevel] = useState<Difficulty>('medium');
   const savedTeam = career ? teams.find((t) => t.id === career.playerTeamId) : undefined;
@@ -80,7 +83,7 @@ function Menu({ teams, career, saveProblem, onNew, onContinue, onTeams }: MenuPr
               {career.results.length} of {career.calendar.length} rounds completed · {difficultyName(career.difficulty)}
             </div>
           </div>
-          <button className="btn primary" onClick={onContinue}>Continue season</button>
+          <button className="btn primary" onClick={onContinue}>{raceSaved ? 'Continue race' : 'Continue season'}</button>
         </div>
       )}
 
@@ -203,6 +206,7 @@ export function App() {
 
   const finishRace = (sim: RaceSim) => {
     if (!career || screen.name !== 'race') return;
+    clearRace();
     const round = career.results.length;
     const rows = scoreRace(sim.results(), sim.fastestLap?.carId ?? null);
     const next = deliverProjects(settleRace(recordRace(career, sim.totalLaps, rows, racing)).career).career;
@@ -224,9 +228,22 @@ export function App() {
     setScreen({ name: 'replay', config, commands: record.commands, key: Date.now(), back });
   };
 
-  const goMenu = () => {
-    if (screen.name === 'race' && !window.confirm('Leave the race? This race will not be saved.')) return;
-    setScreen({ name: 'menu' });
+  // A race left part-way is kept, so leaving it needs no warning.
+  const goMenu = () => setScreen({ name: 'menu' });
+
+  const continueCareer = () => {
+    if (!career) return;
+    const save = loadRace(career);
+    if (save) {
+      const resumed = resumeRace(save, teams);
+      if (resumed) {
+        setScreen({ name: 'race', config: resumed.config, key: Date.now(), start: { sim: resumed.sim, steps: save.steps } });
+        return;
+      }
+      clearRace();
+      window.alert('The race you left could not be picked up in this version of the game. The weekend is ready to run again.');
+    }
+    setScreen(isSeasonOver(career) ? { name: 'season' } : { name: 'hub' });
   };
 
   let body;
@@ -237,6 +254,7 @@ export function App() {
           teams={teams}
           career={career}
           saveProblem={saveProblem}
+          raceSaved={!!career && loadRace(career) !== null}
           onNew={(teamId, difficulty) => {
             clearCareer();
             setSaveProblem(null);
@@ -245,7 +263,7 @@ export function App() {
             setCareer(c);
             setScreen({ name: 'hub' });
           }}
-          onContinue={() => setScreen(career && isSeasonOver(career) ? { name: 'season' } : { name: 'hub' })}
+          onContinue={continueCareer}
           onTeams={() => setScreen({ name: 'teams' })}
         />
       );
@@ -262,7 +280,15 @@ export function App() {
       ) : null;
       break;
     case 'race':
-      body = <RaceScreen key={screen.key} config={screen.config} onFinish={finishRace} />;
+      body = (
+        <RaceScreen
+          key={screen.key}
+          config={screen.config}
+          onFinish={finishRace}
+          start={screen.start}
+          onProgress={(sim, steps) => career && saveRace(career, screen.config, sim, steps)}
+        />
+      );
       break;
     case 'replay': {
       const back = screen.back;

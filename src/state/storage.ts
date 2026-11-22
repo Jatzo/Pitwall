@@ -9,7 +9,8 @@ import type { LogoSpec, TeamDef } from '../engine/types.ts';
 import { parseSave } from './migrate.ts';
 import type { SaveResult } from './migrate.ts';
 import type { Career } from './season.ts';
-import { clearReplays, saveWithRoom } from './replays.ts';
+import { RACE_KEY, clearRace } from './raceSave.ts';
+import { REPLAYS_KEY, clearReplays, saveWithRoom } from './replays.ts';
 
 const TEAMS_KEY = 'pitwall.teams.v1';
 const CAREER_KEY = 'pitwall.career.v2';
@@ -118,7 +119,7 @@ export function loadCareer(teams: readonly TeamDef[]): SaveResult {
   return parseSave(readText(CAREER_KEY), readText(OLD_CAREER_KEY), teams);
 }
 
-/** Saves the career; when storage is full, this season's replays are cleared to make room. */
+/** Saves the career; when storage is full, this season's replays and then the race in progress are cleared to make room. */
 export function saveCareer(career: Career): void {
   let storage: Storage | null = null;
   try {
@@ -126,7 +127,7 @@ export function saveCareer(career: Career): void {
   } catch {
     // Storage unavailable (private mode). The game still works.
   }
-  saveWithRoom(storage, CAREER_KEY, JSON.stringify(career));
+  saveWithRoom(storage, CAREER_KEY, JSON.stringify(career), [REPLAYS_KEY, RACE_KEY]);
 }
 
 export function clearCareer(): void {
@@ -137,4 +138,5 @@ export function clearCareer(): void {
     // Storage unavailable (private mode): nothing was saved, so there is nothing to clear.
   }
   clearReplays();
+  clearRace();
 }

@@ -60,17 +60,21 @@ interface Props {
   onFinish: (sim: RaceSim) => void;
   /** Plays a finished race back from its commands. The player watches but gives no orders, and nothing is recorded. */
   replay?: { commands: CommandLog; onExit: () => void };
+  /** A race picked up where it was left: the sim already run to that point, and how many steps that took. It opens paused. */
+  start?: { sim: RaceSim; steps: number };
+  /** Called with the race and its step count at each new lap for the leader, on pause, on leaving and when the page is hidden. */
+  onProgress?: (sim: RaceSim, steps: number) => void;
 }
 
-export function RaceScreen({ config, onFinish, replay }: Props) {
-  const [sim] = useState(() => new RaceSim(config));
+export function RaceScreen({ config, onFinish, replay, start, onProgress }: Props) {
+  const [sim] = useState(() => start?.sim ?? new RaceSim(config));
   // Live play has an empty log, so live and replay step the race the same way.
   const [feed] = useState(() => new CommandFeed(sim, replay?.commands ?? []));
   const [frame, setFrame] = useState(0);
   const [tick, setTick] = useState(0);
   // Worked out once per refresh, so the memoised story strip redraws only when it changes.
   const glanceNow = useMemo(() => glance(sim), [sim, tick]);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(!start);
   const [speed, setSpeed] = useState(4);
   const [labels, setLabels] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => sim.cars.find((c) => c.isPlayer)?.id ?? null);
@@ -95,6 +99,11 @@ export function RaceScreen({ config, onFinish, replay }: Props) {
   const storyRef = useRef<Story | null>(null);
   const followRef = useRef(followId);
   const directionRef = useRef<Direction | null>(null);
+  // Every step the race has run since the lights, wherever it was run, so a save can pick it up exactly.
+  const stepsRef = useRef(start?.steps ?? 0);
+  const savedLapRef = useRef(sim.phase === 'racing' ? (sim.standings()[0]?.lap ?? 0) : 0);
+  const progressRef = useRef(onProgress);
+  progressRef.current = replay ? undefined : onProgress;
   followRef.current = followId;
   storiesOnRef.current = storiesOn;
   playingRef.current = playing && moment === null;
@@ -102,6 +111,11 @@ export function RaceScreen({ config, onFinish, replay }: Props) {
   // A replay never stops for a decision: the decisions were made when it was raced.
   pauseRef.current = pauseForMoments && !replay;
   momentRef.current = moment;
+
+  // A finished race is the career's to keep, so it is never reported.
+  const saveProgress = useCallback(() => {
+    if (sim.phase !== 'finished') progressRef.current?.(sim, stepsRef.current);
+  }, [sim]);
 
   // Main loop: advance the sim in fixed steps, render every animation frame.
   useEffect(() => {
@@ -117,6 +131,7 @@ export function RaceScreen({ config, onFinish, replay }: Props) {
         let n = 0;
         while (accRef.current >= STEP_S && n < 600 && sim.phase === 'racing') {
           feed.step(STEP_S);
+          stepsRef.current++;
           accRef.current -= STEP_S;
           n++;
           const stories = nextStories(sim, storyWatchRef.current);
@@ -132,6 +147,11 @@ export function RaceScreen({ config, onFinish, replay }: Props) {
           }
         }
         if (n >= 600) accRef.current = 0;
+        const leadLap = sim.phase === 'racing' ? (sim.standings()[0]?.lap ?? 0) : 0;
+        if (leadLap > savedLapRef.current) {
+          savedLapRef.current = leadLap;
+          saveProgress();
+        }
       }
       alphaRef.current = Math.min(1, accRef.current / STEP_S);
       storyRef.current = storiesOnRef.current ? storyQueueRef.current.current(storyClockRef.current, holdFor(speedRef.current)) : null;
@@ -145,7 +165,24 @@ export function RaceScreen({ config, onFinish, replay }: Props) {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [sim, feed]);
+  }, [sim, feed, saveProgress]);
+
+  // Save when play stops, when the page is hidden or closed, and when the race screen is left.
+  useEffect(() => {
+    if (!playing || moment) saveProgress();
+  }, [playing, moment, saveProgress]);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') saveProgress();
+    };
+    window.addEventListener('pagehide', saveProgress);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', saveProgress);
+      document.removeEventListener('visibilitychange', onHide);
+      saveProgress();
+    };
+  }, [saveProgress]);
 
   const dispatch = useCallback(
     (cmd: RaceCommand) => {
@@ -190,6 +227,7 @@ export function RaceScreen({ config, onFinish, replay }: Props) {
     let guard = 0;
     while (sim.phase === 'racing' && guard < 400_000) {
       feed.step(STEP_S);
+      stepsRef.current++;
       guard++;
     }
     watchRef.current = watchMoments(sim);

@@ -14,7 +14,7 @@ import type { Difficulty, StrategyPlan, TeamDef } from '../engine/types.ts';
 import type { WeatherTimeline } from '../engine/weather.ts';
 import type { Career } from './season.ts';
 
-const KEY = 'pitwall.replays.v1';
+export const REPLAYS_KEY = 'pitwall.replays.v1';
 
 export type KeyValue = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -43,7 +43,7 @@ interface Store {
   replays: ReplayRecord[];
 }
 
-function browserStorage(): KeyValue | null {
+export function browserStorage(): KeyValue | null {
   try {
     return window.localStorage;
   } catch {
@@ -53,7 +53,7 @@ function browserStorage(): KeyValue | null {
 
 function readStore(kv: KeyValue | null): Store | null {
   try {
-    const raw = kv?.getItem(KEY);
+    const raw = kv?.getItem(REPLAYS_KEY);
     const store = raw ? (JSON.parse(raw) as Store) : null;
     return store && store.version === 1 && Array.isArray(store.replays) ? store : null;
   } catch {
@@ -63,30 +63,37 @@ function readStore(kv: KeyValue | null): Store | null {
 
 export function clearReplays(kv: KeyValue | null = browserStorage()): void {
   try {
-    kv?.removeItem(KEY);
+    kv?.removeItem(REPLAYS_KEY);
   } catch {
     // Nothing to clear.
   }
 }
 
-/** Writes a value, and if storage is full, clears the replays and tries once more. */
-export function saveWithRoom(kv: KeyValue | null, key: string, text: string): boolean {
+/**
+ * Writes a value, and while storage is full, removes the spare keys one at a time, trying again after
+ * each. By default only the replays are spare.
+ */
+export function saveWithRoom(kv: KeyValue | null, key: string, text: string, spare: readonly string[] = [REPLAYS_KEY]): boolean {
   if (!kv) return false;
-  try {
-    kv.setItem(key, text);
-    return true;
-  } catch {
-    clearReplays(kv);
+  for (let i = 0; ; i++) {
     try {
       kv.setItem(key, text);
       return true;
     } catch {
-      return false;
+      if (i >= spare.length) return false;
+      try {
+        kv.removeItem(spare[i]);
+      } catch {
+        // Nothing to remove.
+      }
     }
   }
 }
 
-export function replayRecord(config: RaceConfig, sim: RaceSim, round: number): ReplayRecord {
+/** A race as it stands: everything a replay keeps except the finishing order. */
+export type RaceLog = Omit<ReplayRecord, 'order'>;
+
+export function raceLog(config: RaceConfig, sim: RaceSim, round: number): RaceLog {
   return {
     round,
     trackId: config.track.id,
@@ -98,9 +105,12 @@ export function replayRecord(config: RaceConfig, sim: RaceSim, round: number): R
     weather: config.weather,
     difficulty: config.difficulty,
     teams: config.teams.map((t) => ({ ...t, logo: { shape: t.logo.shape, initials: t.logo.initials } })),
-    commands: sim.commandLog,
-    order: sim.results().map((r) => r.carId),
+    commands: [...sim.commandLog],
   };
+}
+
+export function replayRecord(config: RaceConfig, sim: RaceSim, round: number): ReplayRecord {
+  return { ...raceLog(config, sim, round), order: sim.results().map((r) => r.carId) };
 }
 
 /** Saves a race's replay for the career's current season. False if it could not be kept. */
@@ -114,7 +124,7 @@ export function saveReplay(career: Career, record: ReplayRecord, kv: KeyValue | 
     replays: [...(same ? old.replays.filter((r) => r.round !== record.round) : []), record],
   };
   try {
-    kv?.setItem(KEY, JSON.stringify(store));
+    kv?.setItem(REPLAYS_KEY, JSON.stringify(store));
     return !!kv;
   } catch {
     // Storage is full: drop the replays rather than crowd out the career save.
@@ -137,7 +147,7 @@ export function replayRounds(career: Career, kv: KeyValue | null = browserStorag
 }
 
 /** The race config to replay, with each team's current editor logo for display. */
-export function replayConfig(record: ReplayRecord, editorTeams: readonly TeamDef[]): RaceConfig {
+export function replayConfig(record: RaceLog, editorTeams: readonly TeamDef[]): RaceConfig {
   return {
     track: trackById(record.trackId),
     teams: record.teams.map((t) => ({ ...t, logo: editorTeams.find((e) => e.id === t.id)?.logo ?? t.logo })),

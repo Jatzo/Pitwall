@@ -45,3 +45,20 @@ export function replayRace(config: RaceConfig, log: CommandLog): RaceSim {
   while (sim.phase === 'racing') feed.step(STEP_S);
   return sim;
 }
+
+/**
+ * Runs a race headless to the point it was left: `steps` fixed steps after the lights, or still on the
+ * grid when steps is 0. Counting steps rather than comparing times keeps it exact. Orders logged at that
+ * moment, given while the race was paused, go in before it is handed back.
+ */
+export function fastForward(config: RaceConfig, log: CommandLog, steps: number): RaceSim {
+  const sim = new RaceSim(config);
+  const feed = new CommandFeed(sim, log);
+  feed.applyDue();
+  if (steps > 0) {
+    sim.start();
+    for (let n = 0; n < steps && sim.phase === 'racing'; n++) feed.step(STEP_S);
+    feed.applyDue();
+  }
+  return sim;
+}

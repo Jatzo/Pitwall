@@ -5,7 +5,7 @@ import { TRACKS } from '../data/tracks.ts';
 import { runQualifying } from './qualifying.ts';
 import { RaceSim } from './race.ts';
 import type { RaceConfig } from './race.ts';
-import { CommandFeed, STEP_S, replayRace } from './replay.ts';
+import { CommandFeed, STEP_S, fastForward, replayRace } from './replay.ts';
 import type { RaceCommand } from './types.ts';
 
 function config(seed = 5): RaceConfig {
@@ -45,6 +45,46 @@ describe('replays', () => {
     assert.deepEqual(laps(again), laps(live));
     // Without the commands the race comes out differently, so the test is not passing by luck.
     assert.notDeepEqual(laps(replayRace(cfg, [])), laps(live));
+  });
+
+  it('picks a race up from a step count and finishes it as if it had never stopped', () => {
+    const cfg = config();
+    const orders: Record<number, RaceCommand> = {
+      40: { type: 'pace', carId: 'cobalt:0', mode: 'push' },
+      // Given at the very step the race is left, as if the player paused, ordered and closed the tab.
+      1500: { type: 'pit', carId: 'cobalt:1', compound: 'H' },
+      2400: { type: 'engine', carId: 'cobalt:0', mode: 'rich' },
+    };
+    const straight = playLive(cfg, orders);
+
+    // Race to step 1500, give that step's order, and leave.
+    const before = new RaceSim(cfg);
+    before.command({ type: 'engine', carId: 'cobalt:1', mode: 'lean' });
+    before.start();
+    const feed = new CommandFeed(before, []);
+    for (let n = 0; n < 1500; n++) {
+      if (orders[n]) before.command(orders[n]);
+      feed.step(STEP_S);
+    }
+    before.command(orders[1500]);
+
+    const resumed = fastForward(cfg, before.commandLog, 1500);
+    assert.equal(resumed.time, before.time);
+    assert.deepEqual(resumed.commandLog, before.commandLog, 'the rebuilt race logs the same orders, so its replay is complete');
+    const after = new CommandFeed(resumed, []);
+    for (let n = 1500; resumed.phase !== 'finished'; n++) {
+      if (orders[n] && n !== 1500) resumed.command(orders[n]);
+      after.step(STEP_S);
+    }
+    assert.deepEqual(resumed.results(), straight.results());
+    assert.deepEqual(laps(resumed), laps(straight));
+  });
+
+  it('leaves a race saved on the grid on the grid, with its grid orders in', () => {
+    const cfg = config();
+    const resumed = fastForward(cfg, [{ t: 0, cmd: { type: 'engine', carId: 'cobalt:1', mode: 'lean' } }], 0);
+    assert.equal(resumed.phase, 'grid');
+    assert.equal(resumed.carById('cobalt:1')?.engineMode, 'lean');
   });
 
   it('keeps a copy of each command, so a later change to it cannot rewrite the log', () => {
